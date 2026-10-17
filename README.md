@@ -39,7 +39,8 @@
 | `index.html` | GitHub Pages용 완성본 (`node build.js`로 만듦) |
 | `src/engine.js` | 규칙 엔진 `DM` — JSON 상태 + `apply(state, action)` |
 | `src/ai.js` | 컴퓨터 `DMAI` |
-| `src/ui.html` | 화면 (엔진·컴퓨터가 빌드 때 들어감) |
+| `src/art.js` | 카드 그림 `DMArt` — 타로 카드 느낌으로 직접 그린 SVG 13장 (원작 카드 그림은 쓰지 않음) |
+| `src/ui.html` | 화면 (엔진·컴퓨터·그림이 빌드 때 들어감) |
 | `build.js` | `index.html`, `dist/dalmuti.html`(Claude 아티팩트용) 생성 |
 | `test/rules.test.js` | 규칙 시험 |
 | `test/sim.js` | 컴퓨터끼리 대국 (멈춤·카드 수 검사, 실력 비교) |

@@ -92,7 +92,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 .center { display: grid; justify-items: center; gap: 10px; max-width: 100%; }
 .trick { display: flex; justify-content: center; min-height: calc(var(--cw) * 1.42 * 1.25); align-items: center; }
 .trick .card { --cw-scale: 1.25; }
-.trick .card + .card { margin-left: calc(var(--cw) * -1.25 * var(--ov, .55)); }
+.trick .card + .card { margin-left: calc(var(--cw) * -1 * var(--cw-scale, 1.25) * var(--ov, .55)); }
+.trick .card { box-shadow: -2px 0 6px rgba(0,0,0,.35); }
 .trick.fly .card { animation: fly .42s cubic-bezier(.2,.8,.25,1) both; }
 .trick.fly .card:nth-child(2) { animation-delay: .03s } .trick.fly .card:nth-child(3) { animation-delay: .06s } .trick.fly .card:nth-child(4) { animation-delay: .09s }
 @keyframes fly { from { transform: translate(var(--fx, 0), var(--fy, -60px)) scale(.55) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -140,7 +141,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   background: var(--bg); border: 1px solid var(--line); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
 }
 .stack .pick {
-  position: absolute; top: -9px; left: 50%; transform: translateX(-50%); height: 20px; min-width: 20px; padding: 0 6px; border-radius: 10px;
+  position: absolute; top: -8px; left: -7px; height: 20px; min-width: 20px; padding: 0 6px; border-radius: 10px;
   background: var(--gold); color: var(--gold-ink); font-size: 11.5px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums;
 }
 .stack.sel { transform: translateY(-10px); }
@@ -158,22 +159,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 .btn.ghost { background: transparent; }
 .btn.sm { padding: 8px 14px; font-size: 13.5px; border-radius: 10px; }
 
-/* 카드 */
+/* 카드 — 타로 카드 그림은 src/art.js */
 .card {
   --w: calc(var(--cw) * var(--cw-scale, 1));
-  position: relative; width: var(--w); height: calc(var(--w) * 1.42); border-radius: calc(var(--w) * .11);
-  background: var(--vellum); color: var(--rc); flex: none; overflow: hidden;
-  display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center;
-  border: 1px solid var(--vellum-edge);
+  position: relative; width: var(--w); height: calc(var(--w) * 1.4167); border-radius: calc(var(--w) * .085);
+  background: var(--vellum); flex: none; overflow: hidden; display: block;
 }
-.card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 30%; background: var(--rc); opacity: .14; }
-.card .n { position: relative; font-family: var(--display); font-weight: 800; font-size: calc(var(--w) * .40); line-height: 1; padding-top: calc(var(--w) * .07); font-variant-numeric: lining-nums; }
-.card svg { width: 58%; height: auto; position: relative; }
-.card .t { font-size: calc(var(--w) * .165); color: var(--card-ink); font-weight: 600; padding-bottom: calc(var(--w) * .07); letter-spacing: -.02em; white-space: nowrap; }
-.card.ghost-j::after { content: "광대"; position: absolute; top: 3px; right: 3px; font-size: 8px; color: var(--card-ink); background: rgba(255,255,255,.7); border-radius: 3px; padding: 0 2px; }
-.c1 { --rc: #6c3196 } .c2 { --rc: #9c2f55 } .c3 { --rc: #b24a2f } .c4 { --rc: #b36a18 } .c5 { --rc: #7f7a1f } .c6 { --rc: #2f7560 }
-.c7 { --rc: #2b6491 } .c8 { --rc: #4e5888 } .c9 { --rc: #7d5f43 } .c10 { --rc: #5b7034 } .c11 { --rc: #5f5246 } .c12 { --rc: #7a5532 } .c13 { --rc: #1f7f7a }
-.card.c13 { background: linear-gradient(160deg, var(--vellum) 60%, #e7d7ef); }
+.card svg.art { display: block; width: 100%; height: 100%; }
+.card svg.art text.no { font-family: var(--display); font-weight: 800; }
+.card svg.art text.nm { font-family: var(--body); font-weight: 600; font-size: 6.6px; letter-spacing: -.02em; }
+.card.ghost-j::after { content: "광대"; position: absolute; top: 3px; right: 3px; font-size: 8px; color: var(--card-ink); background: rgba(255,255,255,.8); border-radius: 3px; padding: 0 2px; }
 
 /* 시트 */
 .sheet-wrap { position: fixed; inset: 0; z-index: 20; display: grid; align-items: end; justify-items: center; background: rgba(6,7,12,.6); padding-top: env(safe-area-inset-top, 0px); }
@@ -801,6 +796,216 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   if (typeof module !== 'undefined' && module.exports) module.exports = AI;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
+<script>/* 달무티 카드 그림 — 타로 카드 느낌 (아치 창 + 인물, 숫자 메달, 이름 리본). 직접 그린 그림 */
+(function (root) {
+  'use strict';
+  var INK = '#2b2333', SKIN = '#f1cba3', GOLD = '#e0b13f', WHITE = '#f7f2e6', VELLUM = '#f3ead5';
+  var RANK = ['', '#6c3196', '#9c2f55', '#b24a2f', '#b36a18', '#6b6720', '#2f7560', '#2b6491', '#4e5888', '#7d5f43', '#5b7034', '#5f5246', '#7a5532', '#1f7f7a'];
+  var NAMES = ['', '달무티', '대주교', '시종장', '남작부인', '수녀원장', '기사', '재봉사', '석공', '요리사', '양치기', '광부', '농노', '어릿광대'];
+
+  function P(d, fill, sw, extra) { return '<path d="' + d + '" fill="' + (fill || 'none') + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 0.7 : sw) + '" stroke-linejoin="round" stroke-linecap="round"' + (extra || '') + '/>'; }
+  function F(d, fill, extra) { return '<path d="' + d + '" fill="' + fill + '"' + (extra || '') + '/>'; }
+  function C(x, y, r, fill, sw) { return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 0.7 : sw) + '"/>'; }
+  function Cf(x, y, r, fill, extra) { return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '"' + (extra || '') + '/>'; }
+  function L(x1, y1, x2, y2, col, w) { return '<path d="M' + x1 + ',' + y1 + 'L' + x2 + ',' + y2 + '" stroke="' + (col || INK) + '" stroke-width="' + (w || 0.7) + '" stroke-linecap="round" fill="none"/>'; }
+  // 굵은 막대: 테두리 + 색
+  function stick(x1, y1, x2, y2, col, w) { return L(x1, y1, x2, y2, INK, w + 1) + L(x1, y1, x2, y2, col, w); }
+  function hand(x, y) { return C(x, y, 1.75, SKIN, 0.6); }
+  function face(x, y, mood) {
+    var s = C(x, y, 5.3, SKIN);
+    s += Cf(x - 1.9, y - 0.2, 0.6, INK) + Cf(x + 1.9, y - 0.2, 0.6, INK);
+    s += Cf(x - 3, y + 1.6, 1, '#e88e7a', ' opacity=".45"') + Cf(x + 3, y + 1.6, 1, '#e88e7a', ' opacity=".45"');
+    if (mood === 'smile') s += P('M' + (x - 2.2) + ',' + (y + 1.8) + 'Q' + x + ',' + (y + 4.2) + ' ' + (x + 2.2) + ',' + (y + 1.8), 'none', 0.6);
+    else if (mood === 'sad') s += P('M' + (x - 1.4) + ',' + (y + 3.2) + 'Q' + x + ',' + (y + 2) + ' ' + (x + 1.4) + ',' + (y + 3.2), 'none', 0.55);
+    else s += P('M' + (x - 1.2) + ',' + (y + 2.6) + 'Q' + x + ',' + (y + 3.3) + ' ' + (x + 1.2) + ',' + (y + 2.6), 'none', 0.55);
+    return s;
+  }
+  function robe(fill, wide) {
+    var w = wide || 0;
+    return P('M22,46Q30,43 38,46L' + (43 + w) + ',76H' + (17 - w) + 'Z', fill);
+  }
+
+  /* 배경 */
+  function rays(a, b) {
+    var s = F('M0,0H60V85H0Z', a);
+    for (var i = 0; i < 16; i += 2) {
+      var t1 = i * Math.PI / 8, t2 = (i + 1) * Math.PI / 8;
+      s += F('M30,36L' + (30 + 60 * Math.cos(t1)).toFixed(1) + ',' + (36 + 60 * Math.sin(t1)).toFixed(1) + 'L' + (30 + 60 * Math.cos(t2)).toFixed(1) + ',' + (36 + 60 * Math.sin(t2)).toFixed(1) + 'Z', b);
+    }
+    return s;
+  }
+  function sky(top, hill, hill2) {
+    var s = F('M0,0H60V85H0Z', top);
+    if (hill2) s += F('M0,64Q14,55 30,62Q44,56 60,61V85H0Z', hill2);
+    s += F('M0,69Q18,62 34,68Q48,64 60,67V85H0Z', hill);
+    return s;
+  }
+  function wall(c, line, floor) {
+    var s = F('M0,0H60V85H0Z', c);
+    for (var y = 20; y < 68; y += 6) {
+      s += L(0, y, 60, y, line, 0.35);
+      for (var x = (y / 6) % 2 ? 4 : 10; x < 60; x += 12) s += L(x, y, x, y + 6, line, 0.35);
+    }
+    return s + F('M0,68H60V85H0Z', floor);
+  }
+  function star(x, y, r, col) {
+    return F('M' + x + ',' + (y - r) + 'L' + (x + r * .3) + ',' + (y - r * .3) + 'L' + (x + r) + ',' + y + 'L' + (x + r * .3) + ',' + (y + r * .3) + 'L' + x + ',' + (y + r) + 'L' + (x - r * .3) + ',' + (y + r * .3) + 'L' + (x - r) + ',' + y + 'L' + (x - r * .3) + ',' + (y - r * .3) + 'Z', col);
+  }
+
+  /* 계급별 그림 (창 안, 가로 9~51 · 세로 13~74) */
+  var ART = {
+    1: function () { // 달무티: 왕관, 담비털 망토, 홀
+      return rays('#f7dc86', '#efc65e') +
+        robe('#6c3196', 3) + P('M27.5,46L26.5,76H33.5L32.5,46Z', WHITE, 0.6) +
+        Cf(30, 52, .5, INK) + Cf(29.6, 58, .5, INK) + Cf(30.3, 64, .5, INK) + Cf(29.8, 70, .5, INK) +
+        P('M21,46.5Q30,51 39,46.5Q30,43 21,46.5Z', WHITE, 0.6) +
+        face(30, 37) + P('M25,38.5Q25.5,46.5 30,47Q34.5,46.5 35,38.5Q32.5,41.5 30,41.4Q27.5,41.5 25,38.5Z', '#ece5d6', 0.6) +
+        P('M24.4,33L24,25.5L27.2,29L30,23.5L32.8,29L36,25.5L35.6,33Z', GOLD) + Cf(30, 30.4, .9, '#c2364c') +
+        stick(43.5, 70, 46, 34, GOLD, 1.3) + C(46.2, 32, 2.3, GOLD) + L(46.2, 29.7, 46.2, 28.2, INK, .6) + hand(44.4, 56);
+    },
+    2: function () { // 대주교: 주교관, 제의, 목장
+      return rays('#f4d8dc', '#eabfc8') +
+        robe(WHITE, 2) + P('M25,46L23.5,76H36.5L35,46Z', '#9c2f55', 0.6) + L(30, 49, 30, 72, GOLD, 1.1) + L(26.8, 55, 33.2, 55, GOLD, 1.1) +
+        face(30, 37) +
+        P('M24.6,33.5Q24.5,25 30,19.5Q35.5,25 35.4,33.5Z', WHITE) + F('M28.6,33.3L28.7,22.3L30,20.8L31.3,22.3L31.4,33.3Z', '#9c2f55') +
+        L(30, 24.5, 30, 29.5, GOLD, .8) + L(28.3, 26.2, 31.7, 26.2, GOLD, .8) +
+        stick(15.5, 74, 16.6, 30, GOLD, 1.2) + P('M16.6,30Q15.6,22.5 20.6,22.2Q24.6,22.6 22.7,26.6Q21,28.6 19.6,26.6', 'none', 2.2) + P('M16.6,30Q15.6,22.5 20.6,22.2Q24.6,22.6 22.7,26.6Q21,28.6 19.6,26.6', 'none', 1.2).replace('stroke="' + INK + '"', 'stroke="' + GOLD + '"') +
+        hand(16.3, 52);
+    },
+    3: function () { // 시종장: 깃털 모자, 직무 사슬, 지휘봉
+      return rays('#f6d8bf', '#edc29f') +
+        robe('#b24a2f', 1) + P('M30,45V76', 'none', .5) +
+        P('M23.5,47Q30,56 36.5,47', 'none', 2.2) + P('M23.5,47Q30,56 36.5,47', 'none', 1.2).replace('stroke="' + INK + '"', 'stroke="' + GOLD + '"') + C(30, 54, 1.9, GOLD) +
+        face(30, 37) + P('M27.4,40.4Q30,39.2 32.6,40.4', 'none', .8) +
+        P('M22.5,32.5Q23,27 30,26.5Q37,27 37.5,32.5Q30,30 22.5,32.5Z', '#3a2a4a') +
+        P('M35,30Q43,25 44,17.5Q40.5,24 33.5,28.6Z', WHITE, .6) +
+        stick(41, 66, 45, 45, '#3a2a4a', 1.6) + Cf(45.2, 44.2, 1.2, GOLD) + Cf(40.8, 66.8, 1.2, GOLD) + hand(42.4, 59);
+    },
+    4: function () { // 남작부인: 고깔모자와 베일, 넓은 드레스, 장미
+      return sky('#d3e5ef', '#9cc28a', '#b7d3a0') +
+        P('M23,46Q30,43 37,46L47,76H13Z', '#b36a18') + P('M26,46Q30,52 34,46', 'none', .6) + L(30, 49, 30, 60, '#f3d29a', .7) +
+        P('M33.5,20Q43,30 41,52Q38,38 34,31Z', WHITE, .5, ' opacity=".9"') +
+        P('M24.4,35Q24,30 27,29L33,29Q36,30 35.6,35Q30,31.5 24.4,35Z', '#5a3d22', .6) +
+        face(30, 38, 'smile') +
+        P('M25.6,30.6L33.6,18.8L35.2,30.2Z', '#e7c46a') + L(26.8, 29, 34.3, 23.5, '#b36a18', .8) +
+        L(39.5, 56, 43, 48.5, '#3f7a3a', 1) + F('M41.6,52.4Q44.4,51 44.4,53Q42.5,53.6 41.6,52.4Z', '#3f7a3a') + C(43.2, 47.5, 2.4, '#c2364c') + P('M42.2,47.4Q43.2,46.2 44.2,47.6', 'none', .45) +
+        hand(39.6, 56.5);
+    },
+    5: function () { // 수녀원장: 베일과 두건, 기도서
+      return wall('#e6dfcc', '#cfc5ad', '#b9ab8c') + P('M44,22Q44,17 48,17Q52,17 52,22V34H44Z', '#c9dbe6', .5) + L(48, 17, 48, 34, INK, .4) +
+        P('M20.5,52Q21,27.5 30,27.5Q39,27.5 39.5,52Z', '#2a2430') +
+        robe('#3b3440', 1) +
+        P('M23.6,45.2Q30,51.5 36.4,45.2Q30,43.2 23.6,45.2Z', WHITE, .6) +
+        C(30, 37.6, 7, WHITE, .6) + face(30, 38) +
+        P('M24.5,53.5H35.5V62.5H24.5Z', '#6b6720') + L(30, 55, 30, 61, GOLD, .9) + L(27.8, 57, 32.2, 57, GOLD, .9) + L(24.5, 62.5, 35.5, 62.5, WHITE, .8) +
+        hand(24.8, 58) + hand(35.2, 58);
+    },
+    6: function () { // 기사: 투구와 깃털, 방패, 칼
+      return sky('#bed6eb', '#8fae74', '#a9c58d') +
+        robe('#9aa3ad', 1) + P('M25.5,46L24.5,76H35.5L34.5,46Z', '#2f7560', .6) + L(30, 47, 30, 75, GOLD, .7) +
+        P('M27,32Q33,18 40,19.5Q34,21.5 31.5,30Z', '#c2364c', .6) +
+        P('M24,40V31.5Q30,25 36,31.5V40Q30,42.5 24,40Z', '#b8c0c8') + P('M24.4,34.6H35.6', 'none', 1.2) + L(30, 36, 30, 41.4, INK, .5) +
+        Cf(27, 38, .45, INK) + Cf(33, 38, .45, INK) + Cf(28.5, 38.8, .45, INK) + Cf(31.5, 38.8, .45, INK) +
+        P('M12.5,50H24V58.5Q24,65.5 18.25,68Q12.5,65.5 12.5,58.5Z', '#2f7560') + L(18.25, 52, 18.25, 65, GOLD, 1.2) + L(14.5, 56.5, 22, 56.5, GOLD, 1.2) +
+        P('M40.6,33L42,31.5L43.4,33V60H40.6Z', '#e3e8ec') + P('M38,60H46', 'none', 2.2) + L(38, 60, 46, 60, GOLD, 1.2) + stick(42, 61, 42, 66, '#6b4a2e', 1.2) + hand(42, 63.5);
+    },
+    7: function () { // 재봉사: 머릿수건, 천, 바늘과 실
+      return wall('#ebdcc6', '#d8c4a7', '#b98f62') +
+        robe('#2b6491', 1) + P('M24,56H36L37.5,76H22.5Z', WHITE, .6) +
+        face(30, 37.6, 'smile') +
+        P('M23.4,37.5Q22.5,28.5 30,28.5Q37.5,28.5 36.6,37.5Q34,32.5 30,32.4Q26,32.5 23.4,37.5Z', '#e2806a') + P('M36,35L39.5,38L37.5,39.5Z', '#e2806a', .6) +
+        P('M12.5,51Q21,47 26,54L22,72Q15,67 12.5,51Z', '#e8d07a') + P('M15,53Q21,51 24,56', 'none', .45, ' stroke-dasharray="1 1"') +
+        L(37.5, 53, 46, 43, '#7d8994', 1.1) + P('M46,43Q50.5,52 42.5,58Q37.5,62.5 41,68', 'none', .7).replace('stroke="' + INK + '"', 'stroke="#b24a2f"') +
+        hand(38.4, 52.6);
+    },
+    8: function () { // 석공: 모자, 가죽 앞치마, 망치, 돌덩이
+      return sky('#dbe2e6', '#aaa497', '#c3bdb1') +
+        robe('#4e5888', 1) + P('M24.5,54H35.5L36.5,76H23.5Z', '#8a6a48', .6) +
+        face(30, 37.5) + P('M23.8,35Q23.8,28.6 30,28.6Q36.2,28.6 36.2,35Q30,32.2 23.8,35Z', '#b9b2a2') +
+        P('M10,63H25V75H10Z', '#d2c9b6') + L(10, 69, 25, 69, INK, .45) + L(17, 63, 17, 69, INK, .45) + L(14, 69, 14, 75, INK, .45) + L(21, 69, 21, 75, INK, .45) +
+        stick(40.5, 62, 45.5, 46, '#8a6a48', 1.3) + P('M41.4,43L48.6,46.4L47.2,49.4L40,46Z', '#9aa3ad') + hand(41.6, 58.5);
+    },
+    9: function () { // 요리사: 요리 모자, 앞치마, 냄비와 국자
+      return wall('#f1dec3', '#e0c7a4', '#a4794e') +
+        robe('#7d5f43', 1) + P('M24.5,48H35.5L37,76H23Z', WHITE, .6) +
+        face(30, 38, 'smile') +
+        P('M24.5,35Q21.5,28 25.5,27Q26.5,22.5 30,23.5Q33.5,22.5 34.5,27Q38.5,28 35.5,35Z', WHITE) + L(24.6, 33, 35.4, 33, INK, .5) +
+        P('M21,49Q19.5,46.5 21.5,44.5Q23.5,42.5 22,40M25,49Q23.5,46.5 25.5,44.5', 'none', .6).replace('stroke="' + INK + '"', 'stroke="#b39c86"') +
+        P('M14,55H30V62Q30,68 22,68Q14,68 14,62Z', '#3a3532') + L(13, 55, 31, 55, INK, 1.4) + L(13.4, 55, 30.6, 55, '#6b625c', .6) +
+        stick(41, 62, 43.5, 44, '#9aa3ad', .9) + C(43.8, 42.6, 2.1, '#9aa3ad') + hand(41.2, 59.8) + hand(30.4, 58);
+    },
+    10: function () { // 양치기: 밀짚모자, 지팡이, 양
+      return sky('#cfe7f1', '#9ec27d', '#b9d699') + Cf(48, 21, 3.2, '#f3dd8a') +
+        robe('#5b7034', 1) + P('M26,46L27,56H33L34,46', WHITE, .6) + L(27.5, 49, 32.5, 52, INK, .4) + L(32.5, 49, 27.5, 52, INK, .4) +
+        face(30, 37.8, 'smile') +
+        P('M19.5,33.6Q30,29.5 40.5,33.6Q30,36.8 19.5,33.6Z', '#e2c46b') + P('M25,33Q25,27.5 30,27.5Q35,27.5 35,33Z', '#e2c46b') + L(25.2, 31.6, 34.8, 31.6, '#c2364c', 1) +
+        stick(43, 75, 43, 31, '#8a6a48', 1.2) + P('M43,31Q43,24.5 38.5,25Q35.6,26 37.4,29.4', 'none', 2.2) + P('M43,31Q43,24.5 38.5,25Q35.6,26 37.4,29.4', 'none', 1.2).replace('stroke="' + INK + '"', 'stroke="#8a6a48"') + hand(43, 50) +
+        L(12.5, 70, 12.5, 74, INK, .9) + L(19, 70, 19, 74, INK, .9) +
+        P('M10.5,66Q10,62 13.5,62Q15,59.5 18,61Q21.5,60.5 21.5,64Q23,67 20,69Q17,71.5 14,69.5Q10.5,70 10.5,66Z', WHITE, .6) + P('M8,62.5Q8,60 10.5,60.5Q12,62 11,64.5Q9,65.5 8,62.5Z', '#3a3532', .5);
+    },
+    11: function () { // 광부: 두건, 곡괭이, 바위
+      return F('M0,0H60V85H0Z', '#6e655c') + F('M0,30L10,22L18,28L26,18L34,26L44,16L52,24L60,20V0H0Z', '#5a5249') + F('M0,70Q20,64 60,69V85H0Z', '#4f463e') +
+        robe('#5f5246', 1) + L(22.5, 58, 38, 58, '#3a3532', 1.6) +
+        P('M22.5,41Q22,27.5 30,27.5Q38,27.5 37.5,41L35.5,39Q30,31 24.5,39Z', '#8a7a68') +
+        face(30, 37.8) + Cf(27.4, 40.2, 1.1, '#5f5246', ' opacity=".35"') +
+        stick(19.5, 57, 39, 31, '#8a6a48', 1.3) + P('M32.5,26.3Q40.5,26.2 47.5,33.5', 'none', 2.6) + P('M32.5,26.3Q40.5,26.2 47.5,33.5', 'none', 1.5).replace('stroke="' + INK + '"', 'stroke="#aab2ba"') + hand(23.4, 52) +
+        P('M40,76L42,69L47,67L51,71L52,76Z', '#8d8378', .6) + P('M9,76L11,71L16,70L18,76Z', '#a1978b', .6) + F('M46,70L47,68.5L48.2,70Z', '#e9cf6a');
+    },
+    12: function () { // 농노: 헝클어진 머리, 누더기, 밀단
+      return sky('#e9dfc3', '#b59c63', '#c9b47e') + L(4, 70, 56, 70, '#9c8450', .4) +
+        P('M22,46Q30,43 38,46L42,69L39.5,73L37,69L34,74L31.5,69L28.5,73.5L26,69L23,73L20.5,69L18,72Z', '#7a5532') +
+        P('M24.5,57H29.5V62H24.5Z', '#a58457', .5) + L(25.5, 57.5, 25.5, 61.5, INK, .3) + L(28.5, 57.5, 28.5, 61.5, INK, .3) + L(23.5, 53, 37.5, 53, '#c9b47e', 1) +
+        face(30, 38, 'sad') +
+        P('M24.3,36.5Q23.5,30 26,29L25.6,31.3L28,28L28.4,30.4L30.6,27.6L31.4,30.2L33.6,28.4L33.6,31L35.8,30Q36.6,33 35.7,36.5Q33,32.5 30,32.4Q27,32.5 24.3,36.5Z', '#5a3d22', .6) +
+        L(40, 66, 43.6, 44, '#c99a3b', .8) + L(40.6, 66, 40.4, 43.4, '#c99a3b', .8) + L(41.2, 66, 46.6, 46, '#c99a3b', .8) + L(39.6, 66, 37.4, 45.4, '#c99a3b', .8) +
+        P('M43.6,44Q42.6,41 43.8,39.2Q45,41 43.6,44Z', '#e0b13f', .45) + P('M40.4,43.4Q39.4,40.4 40.5,38.6Q41.7,40.4 40.4,43.4Z', '#e0b13f', .45) +
+        P('M46.6,46Q46.2,42.8 47.8,41.4Q48.6,43.6 46.6,46Z', '#e0b13f', .45) + P('M37.4,45.4Q36.2,42.6 37,40.6Q38.6,42.2 37.4,45.4Z', '#e0b13f', .45) +
+        L(39, 56, 42.6, 56, '#7a5532', 1.4) + hand(40.6, 58);
+    },
+    13: function () { // 어릿광대: 방울 모자, 얼룩 옷, 광대 지팡이
+      var s = F('M0,0H60V85H0Z', '#2d3364');
+      [[15, 22, 1.6], [46, 18, 2], [12, 44, 1.2], [50, 40, 1.4], [20, 14, 1], [40, 12, 1], [8, 60, 1], [53, 58, 1.2]].forEach(function (p) { s += star(p[0], p[1], p[2], '#f6e6a8'); });
+      s += F('M0,70Q30,64 60,70V85H0Z', '#1f2550');
+      s += P('M22,46Q26,44.5 30,44.2V76H17Z', '#1f7f7a') + P('M38,46Q34,44.5 30,44.2V76H43Z', '#6c3196');
+      s += P('M30,52L32.5,56L30,60L27.5,56Z', '#6c3196', .5) + P('M30,62L32.5,66L30,70L27.5,66Z', '#1f7f7a', .5);
+      s += P('M21.5,46L24,50L26.5,46.6L28.2,51L30,46.8L31.8,51L33.5,46.6L36,50L38.5,46L30,43.8Z', GOLD, .6);
+      s += face(30, 38.2, 'smile');
+      s += P('M24.2,34Q19,22 12.5,26.6Q18.5,26.5 23,35.4Z', '#1f7f7a') + P('M35.8,34Q41,22 47.5,26.6Q41.5,26.5 37,35.4Z', '#6c3196');
+      s += P('M30,33.5Q30,24 30,22.5Q27,27 24.2,34M30,22.5Q33,27 35.8,34', 'none', .5);
+      s += P('M24.2,34Q30,23 35.8,34Z', '#c2364c', .6);
+      s += P('M23.6,35.3Q30,31.4 36.4,35.3Q30,33.4 23.6,35.3Z', GOLD, .6);
+      s += C(12.6, 27, 1.7, GOLD, .6) + C(47.4, 27, 1.7, GOLD, .6) + C(30, 22.2, 1.5, GOLD, .6);
+      s += stick(42, 74, 42, 53, '#8a6a48', 1.1) + C(42, 50.4, 2.7, SKIN, .6) + P('M39.4,49.6Q42,44 44.6,49.6Z', '#c2364c', .5) + hand(42, 61);
+      return s;
+    }
+  };
+
+  var cache = {};
+  function svg(v) {
+    if (cache[v]) return cache[v];
+    var rc = RANK[v], win = 'M9,75V34A21,21 0 0 1 51,34V75Z', id = 'dmw' + v;
+    var s = '<svg class="art" viewBox="0 0 60 85" aria-hidden="true" focusable="false">' +
+      '<defs><clipPath id="' + id + '"><path d="' + win + '"/></clipPath></defs>' +
+      '<rect x=".5" y=".5" width="59" height="84" rx="5" fill="' + VELLUM + '"/>' +
+      '<rect x="2.6" y="2.6" width="54.8" height="79.8" rx="3.2" fill="none" stroke="' + rc + '" stroke-width="1.3"/>' +
+      '<rect x="4.4" y="4.4" width="51.2" height="76.2" rx="2.2" fill="none" stroke="' + rc + '" stroke-width=".4"/>' +
+      '<g clip-path="url(#' + id + ')">' + ART[v]() + '</g>' +
+      '<path d="' + win + '" fill="none" stroke="' + INK + '" stroke-width=".9"/>' +
+      '<path d="M7,72.5H53L50.6,77.5L53,82.5H7L9.4,77.5Z" fill="' + rc + '" stroke="' + INK + '" stroke-width=".6"/>' +
+      '<text class="nm" x="30" y="77.9" text-anchor="middle" dominant-baseline="central" fill="#fff">' + NAMES[v] + '</text>' +
+      '<circle cx="30" cy="14" r="12.6" fill="' + VELLUM + '" stroke="' + rc + '" stroke-width="1.5"/>' +
+      '<circle cx="30" cy="14" r="10.6" fill="none" stroke="' + rc + '" stroke-width=".4"/>' +
+      (v === 13 ? star(30, 14, 7.5, rc) :
+        '<text class="no" x="30" y="14.8" text-anchor="middle" dominant-baseline="central" fill="' + rc + '" font-size="' + (v >= 10 ? 16.5 : 20) + '">' + v + '</text>') +
+      '</svg>';
+    cache[v] = s;
+    return s;
+  }
+
+  root.DMArt = { svg: svg, RANK: RANK };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.DMArt;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
 <script>
 (function () {
 'use strict';
@@ -808,29 +1013,12 @@ var DM = window.DM, AI = window.DMAI;
 var KEY = 'dalmuti-v1';
 var NAMES = ['민지', '도윤', '서연', '하준', '지우', '은우', '수아', '시우', '하린'];
 var AVATAR = ['#8a4fb3', '#3d7fae', '#b0583c', '#3f8a6e', '#a8892f', '#a34a72', '#5b6aa8', '#6f8a3c'];
-var EMB = {
-  1: '<path d="M4 17h16l1-9-5 4-4-7-4 7-5-4z"/><path d="M5 20.5h14"/><circle cx="12" cy="12.5" r="1.2"/>',
-  2: '<path d="M7.5 21V11c0-3.5 2.4-6.5 4.5-8.5 2.1 2 4.5 5 4.5 8.5v10z"/><path d="M12 8v9M9.3 11.6h5.4"/>',
-  3: '<circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M16.5 16.5l2-2M19 19l2-2"/>',
-  4: '<circle cx="12" cy="8.5" r="4"/><path d="M12 6.5c1 .5 1.5 1.5 1 2.5M12 12.5V21M12 17c-2.5 0-4.2-1.2-5-3M12 18.5c2.5 0 4.2-1.2 5-3"/>',
-  5: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M12 7.5v8M9.3 10.2h5.4"/>',
-  6: '<path d="M12 2.5l1.6 3V15h-3.2V5.5z"/><path d="M7.5 15h9M12 15v5M10 21h4"/>',
-  7: '<path d="M18.5 3.5L7 20"/><circle cx="17.6" cy="5" r=".9"/><path d="M17.3 5.6c-4 2-9.5 1.5-11.5 5s2.5 6 5.5 3.5"/>',
-  8: '<path d="M4.5 9.5l5-5 4 4-5 5z"/><path d="M11.5 11.5l8.5 8.5"/><path d="M3 21h8"/>',
-  9: '<path d="M3.5 11h17"/><path d="M5.5 11v4a5 5 0 0 0 5 5h3a5 5 0 0 0 5-5v-4"/><path d="M9 7.5c0-1.4 1.2-1.4 1.2-3M13.5 7.5c0-1.4 1.2-1.4 1.2-3"/>',
-  10: '<path d="M10 21V8.5a4 4 0 1 1 8 0v1.5"/><path d="M6 21h8"/>',
-  11: '<path d="M3.5 9.5C8 4.5 16 4.5 20.5 9.5"/><path d="M12.5 6L8 21"/>',
-  12: '<path d="M12 21V7"/><path d="M12 7c-2-1-3-3-3-5 2 1 3 3 3 5zM12 7c2-1 3-3 3-5-2 1-3 3-3 5z"/><path d="M12 12.5c-2.2-.8-4-2.4-4-4.5 2.2.6 4 2.4 4 4.5zM12 12.5c2.2-.8 4-2.4 4-4.5-2.2.6-4 2.4-4 4.5z"/><path d="M12 17c-2.2-.8-4-2.4-4-4.5 2.2.6 4 2.4 4 4.5zM12 17c2.2-.8 4-2.4 4-4.5-2.2.6-4 2.4-4 4.5z"/>',
-  13: '<path d="M4 20.5h16"/><path d="M5.5 20.5L7 9l5 5 5-5 1.5 11.5"/><path d="M7 9L3.8 5.5M17 9l3.2-3.5M12 14V4.5"/><circle cx="3.5" cy="5" r="1.3"/><circle cx="20.5" cy="5" r="1.3"/><circle cx="12" cy="3.5" r="1.3"/>'
-};
+
 
 function el(id) { return document.getElementById(id); }
 function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 function cardHTML(v, extra) {
-  return '<div class="card c' + v + (extra ? ' ' + extra : '') + '" aria-label="' + (v === 13 ? '어릿광대' : v + ' ' + DM.CARD_NAMES[v]) + '">' +
-    '<span class="n">' + (v === 13 ? '✦' : v) + '</span>' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + EMB[v] + '</svg>' +
-    '<span class="t">' + DM.CARD_NAMES[v] + '</span></div>';
+  return '<div class="card c' + v + (extra ? ' ' + extra : '') + '" role="img" aria-label="' + (v === 13 ? '어릿광대' : v + ' ' + DM.CARD_NAMES[v]) + '">' + DMArt.svg(v) + '</div>';
 }
 function miniCards(list) { return '<span class="mini-cards">' + list.map(function (v) { return cardHTML(v); }).join('') + '</span>'; }
 function moveText(m) {
@@ -1129,8 +1317,9 @@ function renderCenter() {
 }
 function playCards(p) {
   var list = []; if (p.v === 13) for (var i = 0; i < p.j; i++) list.push(13); else { for (var k = 0; k < p.n; k++) list.push(p.v); for (var q = 0; q < p.j; q++) list.push(13); }
-  var ov = list.length > 8 ? .78 : list.length > 4 ? .68 : .5;
-  return list.map(function (v) { return cardHTML(v, (p.v !== 13 && v === 13) ? 'ghost-j' : '').replace('class="card', 'style="--ov:' + ov + '" class="card'); }).join('');
+  var ov = list.length > 8 ? .74 : list.length > 5 ? .62 : list.length > 3 ? .4 : .25;
+  var sc = list.length > 6 ? 1 : 1.25;
+  return list.map(function (v) { return cardHTML(v, (p.v !== 13 && v === 13) ? 'ghost-j' : '').replace('class="card', 'style="--ov:' + ov + ';--cw-scale:' + sc + '" class="card'); }).join('');
 }
 function taxSummaryLine() {
   return S.tax.pairs.map(function (p) { return esc(S.players[p.from].name) + ' → ' + esc(S.players[p.to].name) + ' ' + p.k + '장'; }).join(' · ');

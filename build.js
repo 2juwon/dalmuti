@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const r = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
 let ui = r('src/ui.html');
-const engine = r('src/engine.js'), ai = r('src/ai.js');
-ui = ui.replace('/*@ENGINE*/', () => engine).replace('/*@AI*/', () => ai);
+const engine = r('src/engine.js'), ai = r('src/ai.js'), art = r('src/art.js');
+ui = ui.replace('/*@ENGINE*/', () => engine).replace('/*@AI*/', () => ai).replace('/*@ART*/', () => art);
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(__dirname, 'dist/dalmuti.html'), ui);
 const head = `<!doctype html>
