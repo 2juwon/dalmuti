@@ -46,6 +46,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 .game-no { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .top .sp { flex: 1; }
 .icon-btn { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--ink); }
+.icon-btn.bgm { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; color: var(--muted); }
+.icon-btn.bgm svg { width: 16px; height: 16px; }
+.icon-btn.bgm[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
+.icon-btn.bgm[aria-pressed="false"] svg { opacity: .55; }
 
 /* 궁정 서열 */
 .court { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 4px; padding-block: 4px 14px; }
@@ -228,6 +232,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     <div class="game-no" id="gameNo"></div>
     <div class="conn" id="conn" hidden></div>
     <div class="sp"></div>
+    <button class="icon-btn bgm" id="bgmBtn" type="button" aria-pressed="true" aria-label="배경 음악"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></button>
     <button class="icon-btn" id="rulesBtn" type="button">규칙</button>
     <button class="icon-btn" id="menuBtn" type="button">메뉴</button>
   </header>
@@ -252,6 +257,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 <script>/*@ENGINE*/</script>
 <script>/*@AI*/</script>
 <script>/*@ART*/</script>
+<script>/*@MUSIC*/</script>
 <script>
 (function () {
 'use strict';
@@ -274,7 +280,7 @@ function moveText(m) {
 function josa(word, a, b) { var c = word.charCodeAt(word.length - 1); if (c < 0xac00 || c > 0xd7a3) return word + b; return word + (((c - 0xac00) % 28) ? a : b); }
 
 /* ───── 설정·저장 ───── */
-var settings = { name: '나', n: 5, level: 'normal', games: 5, firstTax: true, autoPass: true, sound: true };
+var settings = { name: '나', n: 5, level: 'normal', games: 5, firstTax: true, autoPass: true, sound: true, bgm: true };
 var S = null;        // 게임 상태 (온라인이면 서버가 보내 준 내 보기)
 var ME = 0;          // 내 자리 (혼자 하기는 0, 온라인은 서버가 정함)
 var NET = null;      // 온라인 접속 정보 { code, room, offset, ... }
@@ -290,7 +296,20 @@ function save() {
 
 /* ───── 소리 ───── */
 var AC = null;
-function ac() { if (!settings.sound) return null; try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } return AC; }
+function audio() { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } return AC; }
+function ac() { bgmSync(true); return settings.sound ? audio() : null; }
+/* 배경 음악: 처음 누를 때 시작 (브라우저가 그 전엔 소리를 막음), 화면이 가려지면 멈춤 */
+function bgmSync(gesture) {
+  if (!window.DMMusic) return;
+  var want = settings.bgm && !document.hidden;
+  if (want && (AC || gesture)) DMMusic.start(audio());
+  else if (!want) DMMusic.stop();
+  var b = document.getElementById('bgmBtn');
+  if (b) { b.setAttribute('aria-pressed', settings.bgm ? 'true' : 'false'); b.title = settings.bgm ? '배경 음악 끄기' : '배경 음악 켜기'; }
+}
+document.addEventListener('pointerdown', function () { bgmSync(true); }, true);
+document.addEventListener('keydown', function () { bgmSync(true); }, true);
+document.addEventListener('visibilitychange', function () { bgmSync(false); });
 function tone(f, d, type, vol, when) {
   var a = ac(); if (!a) return; var t = a.currentTime + (when || 0);
   var o = a.createOscillator(), g = a.createGain(); o.type = type || 'triangle'; o.frequency.value = f;
@@ -827,12 +846,14 @@ function showResult() {
 function showMenu() {
   el('sheet').dataset.dismiss = '1';
   openSheet('<h2>메뉴</h2>' +
+    '<label class="switch"><span>배경 음악 (르네상스 류트)</span><input type="checkbox" id="bgmIn"' + (settings.bgm ? ' checked' : '') + '></label>' +
     '<label class="switch"><span>효과음</span><input type="checkbox" id="sndIn"' + (settings.sound ? ' checked' : '') + '></label>' +
     (NET ? '' : '<label class="switch"><span>낼 게 없으면 자동 패스</span><input type="checkbox" id="apIn"' + (settings.autoPass ? ' checked' : '') + '></label>') +
     (NET ? '<p class="seg-note">방 번호 <b>' + NET.code + '</b>' + (NET.room ? ' · 제한 시간 ' + NET.room.settings.turnSec + '초' : '') + '</p>' : '') +
     '<div class="btns"><button class="btn" id="mRules" type="button">규칙 보기</button><button class="btn" id="mNew" type="button">' + (NET ? '방 나가기' : '새 게임') + '</button><button class="btn primary" id="mClose" type="button" data-focus>계속하기</button></div>',
     afterSheet, 'menu');
   el('sndIn').onchange = function () { settings.sound = this.checked; save(); };
+  el('bgmIn').onchange = function () { settings.bgm = this.checked; save(); bgmSync(true); };
   if (el('apIn')) el('apIn').onchange = function () { settings.autoPass = this.checked; save(); };
   el('mRules').onclick = function () { showRules(showMenu); };
   el('mNew').onclick = function () {
@@ -860,6 +881,7 @@ function showRules(back) {
     '</div><div class="btns"><button class="btn primary" id="rBack" type="button" data-focus>' + (back ? '돌아가기' : '닫기') + '</button></div>', afterSheet, 'rules');
   el('rBack').onclick = function () { if (back) { sheetClose = null; back(); } else closeSheet(); };
 }
+el('bgmBtn').onclick = function () { settings.bgm = !settings.bgm; save(); bgmSync(true); };
 el('menuBtn').onclick = function () { ac(); clearTimeout(ui.timer); if (sheetKind === 'joining') return; showMenu(); };
 el('rulesBtn').onclick = function () { clearTimeout(ui.timer); if (sheetKind === 'joining') return; showRules(null); };
 
@@ -1092,6 +1114,8 @@ setInterval(function () { if (NET && NET.ws && NET.ws.readyState === 1) { try { 
 /* ───── 부팅 ───── */
 function start(data) {
   load();
+  if (settings.bgm == null) settings.bgm = true;
+  bgmSync(false);
   if (data && data.state) { S = data.state; if (data.settings) Object.assign(settings, data.settings); }
   var hash = (location.hash.match(/^#(\d{6})$/) || [])[1];
   var saved = null; try { saved = localStorage.getItem(ROOM_KEY); } catch (e) {}

@@ -9,8 +9,8 @@ if (server == null) { try { server = JSON.parse(r('config.json')).server || ''; 
 if (server && !/^https?:\/\/[\w.:-]+$/.test(server)) throw new Error('서버 주소가 이상해요: ' + server);
 const out = arg('out') || 'index.html';
 let ui = r('src/ui.html');
-const engine = r('src/engine.js'), ai = r('src/ai.js'), art = r('src/art.js');
-ui = ui.replace('/*@ENGINE*/', () => engine).replace('/*@AI*/', () => ai).replace('/*@ART*/', () => art);
+const engine = r('src/engine.js'), ai = r('src/ai.js'), art = r('src/art.js'), music = r('src/music.js');
+ui = ui.replace('/*@ENGINE*/', () => engine).replace('/*@AI*/', () => ai).replace('/*@ART*/', () => art).replace('/*@MUSIC*/', () => music);
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });
 // 아티팩트 안에서는 다른 서버에 접속할 수 없어서 혼자 하기만
 fs.writeFileSync(path.join(__dirname, 'dist/dalmuti.html'), ui.replace('__SERVER_URL__', ''));
