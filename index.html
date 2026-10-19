@@ -1285,6 +1285,7 @@ function schedule() {
     var delay = p.kind === 'play' ? 620 + Math.random() * 420 : 500;
     if (last && last.t === 'clear') delay += 650;
     if (last && last.t === 'out') delay += 500;
+    if (S.finished.indexOf(ME) >= 0) delay /= 2; // 내가 다 털었으면 남은 판은 2배속
     if (window.__dalmutiFast) delay = 15;
     ui.timer = setTimeout(function () {
       var a = AI.decide(S);
@@ -1447,7 +1448,7 @@ function renderHand() {
     html += '<button type="button" class="stack' + (picked ? ' sel' : '') + (dim ? ' dim' : '') + '" data-v="' + v + '" style="--pile:' + (sh.join(',') || '0 0 0 transparent') + '" aria-label="' + (v === 13 ? '어릿광대' : v) + ' ' + h[v] + '장">' +
       cardHTML(v) + (h[v] > 1 ? '<span class="badge">' + h[v] + '</span>' : '') + (picked ? '<span class="pick">' + picked + '</span>' : '') + '</button>';
   }
-  el('hand').innerHTML = html || '<div class="empty-msg">' + (S.phase === 'drawn' || S.phase === 'draw' ? '' : '손패를 다 털었어요<small>' + (S.finished.indexOf(ME) + 1) + '등 · 남은 사람들을 지켜보세요</small>') + '</div>';
+  el('hand').innerHTML = html || '<div class="empty-msg">' + (S.phase === 'drawn' || S.phase === 'draw' ? '' : '손패를 다 털었어요<small>' + (S.finished.indexOf(ME) + 1) + '등 · ' + (NET ? '남은 사람들을 지켜보세요' : '기다리기 싫으면 아래 버튼으로 바로 결과를 봐요') + '</small>') + '</div>';
 
   fitCards();
   var pass = el('passBtn'), play = el('playBtn');
@@ -1455,6 +1456,13 @@ function renderHand() {
     pass.disabled = true; var t = selTotal();
     play.disabled = t !== g.k; play.textContent = '돌려주기 (' + t + '/' + g.k + ')';
     hint('돌려줄 카드 <b>' + g.k + '장</b>을 고르세요');
+    return;
+  }
+  play.dataset.skip = '';
+  if (!NET && out && S.phase === 'play') {
+    pass.disabled = true; play.disabled = false; play.dataset.skip = '1';
+    play.textContent = '건너뛰고 결과 보기';
+    hint('남은 판은 <b>2배속</b>으로 진행 중이에요');
     return;
   }
   if (!myTurn) {
@@ -1530,9 +1538,20 @@ el('hand').addEventListener('click', function (e) {
   }
   renderHand();
 });
+// 남은 컴퓨터들의 판을 한 번에 끝내고 결과 보기 (혼자 하기에서 내가 다 털었을 때)
+function skipRest() {
+  clearTimeout(ui.timer);
+  var budget = AI.budget, n = 0;
+  AI.budget = 60;
+  try { while (S.phase === 'play' && n++ < 3000) { var a = AI.decide(S); if (!a) break; S = DM.apply(S, a); } }
+  finally { AI.budget = budget; }
+  ui.sel = {}; ui.seenSeq = S.seq; sweep = null; flyFrom = null;
+  save(); render(); showResult();
+}
 el('playBtn').addEventListener('click', function () {
   ac();
   if (!S) return;
+  if (this.dataset.skip) { skipRest(); return; }
   var g = giveMode();
   if (g) {
     var cards = []; for (var k in ui.sel) for (var i = 0; i < ui.sel[k]; i++) cards.push(+k);
