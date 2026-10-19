@@ -39,13 +39,13 @@
 html, body { height: 100%; }
 body {
   background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px;
-  overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  overflow-x: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 #app {
-  height: 100%; display: grid; grid-template-rows: auto auto 1fr auto; max-width: 980px; margin: 0 auto;
+  min-height: 100%; display: grid; grid-template-rows: auto auto minmax(min-content, 1fr) auto; max-width: 980px; margin: 0 auto;
   padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
 }
 @media (min-width: 420px) { #app { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); } }
@@ -84,9 +84,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 
 /* 탁자 */
 .table {
-  position: relative; min-height: 0; border-radius: 22px; overflow: hidden;
+  position: relative; min-height: 200px; border-radius: 22px; overflow: visible;
   background: radial-gradient(120% 90% at 50% 40%, var(--table-hi), var(--table) 70%);
-  border: 1px solid var(--line); display: grid; place-items: center; padding: 14px;
+  border: 1px solid var(--line); display: grid; place-items: safe center; padding: 14px;
 }
 .table::before { content: ""; position: absolute; inset: 10px; border: 1px dashed rgba(219,178,91,.18); border-radius: 16px; pointer-events: none; }
 .center { display: grid; justify-items: center; gap: 10px; max-width: 100%; }
@@ -1353,7 +1353,7 @@ function renderCenter() {
         '<p>가장 좋은 카드 ' + mine.k + '장을 받았어요. 이제 손패에서 <b>필요 없는 카드 ' + mine.k + '장</b>을 골라 돌려주세요. 낱장으로 남은 큰 수가 보통 가장 쓸모없어요.</p>' +
         '<div class="row"><button class="btn sm" id="autoGive" type="button">추천 고르기</button></div></div>';
       el('autoGive').onclick = function () {
-        var pick = AI.chooseGiveBack(S, 0, mine.k, 'normal'); ui.sel = {};
+        var pick = AI.chooseGiveBack(S, ME, mine.k, 'normal'); ui.sel = {};
         pick.forEach(function (v) { ui.sel[v] = (ui.sel[v] || 0) + 1; }); renderHand();
       };
     } else c.innerHTML = '<div class="empty-msg">세금을 걷는 중<small>' + taxSummaryLine() + '</small></div>';
@@ -1449,6 +1449,7 @@ function renderHand() {
   }
   el('hand').innerHTML = html || '<div class="empty-msg">' + (S.phase === 'drawn' || S.phase === 'draw' ? '' : '손패를 다 털었어요<small>' + (S.finished.indexOf(ME) + 1) + '등 · 남은 사람들을 지켜보세요</small>') + '</div>';
 
+  fitCards();
   var pass = el('passBtn'), play = el('playBtn');
   if (g) {
     pass.disabled = true; var t = selTotal();
@@ -1474,6 +1475,22 @@ function renderHand() {
     else hint(m && err ? err : '<b>' + need + '보다 작은 수 ' + S.trick.count + '장</b>을 내거나 패스');
   } else hint(m && err ? err : '<b>내가 선</b> · 같은 숫자를 원하는 만큼 (어릿광대를 섞으면 그 수가 돼요)');
 }
+/* 카드 크기: 폭 기준 크기(46/60/68)에서 시작해, 손패·탁자·궁정이 화면 높이에 들어갈 때까지 줄임 (폴드처럼 넓고 짧은 화면, 가로 화면) */
+var fitCw = 0;
+function fitCards() {
+  var hand = el('hand'), me = hand.parentNode, W = innerWidth, H = innerHeight;
+  var cap = W >= 1000 ? 68 : W >= 640 ? 60 : 46;
+  var stacks = hand.querySelectorAll('.stack').length || 10;
+  var fixed = document.querySelector('.top').offsetHeight + el('court').offsetHeight + (me.offsetHeight - hand.offsetHeight) + 6;
+  var hw = hand.clientWidth || (W - 32), tableMin = 210, pick = 38;
+  for (var cw = cap; cw >= 38; cw -= 2) {
+    var per = Math.max(1, Math.floor((hw + 6) / (cw + 6))), rows = Math.ceil(stacks / per);
+    var handH = 12 + rows * cw * 1.4167 + (rows - 1) * 10;
+    if (fixed + handH + Math.max(tableMin, cw * 1.25 * 1.42 + 70) <= H) { pick = cw; break; }
+  }
+  if (pick !== fitCw) { fitCw = pick; document.documentElement.style.setProperty('--cw', pick + 'px'); }
+}
+addEventListener('resize', function () { if (S) fitCards(); });
 function hint(t, warn) { var e = el('hint'); e.innerHTML = t; e.className = 'hint' + (warn ? ' warn' : ''); }
 function shake(v) { var b = el('hand').querySelector('[data-v="' + v + '"]'); if (b) { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); } }
 

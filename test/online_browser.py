@@ -18,7 +18,7 @@ DECIDE = '''() => { const D = window.__dalmuti, S = D.get(), me = D.me(); const 
 def mk(b, name, hash_=''):
     ctx = b.new_context(viewport={'width': 390, 'height': 844}, color_scheme='dark')
     pg = ctx.new_page()
-    pg.on('pageerror', lambda e: errors.append(name + ': ' + str(e)))
+    pg.on('pageerror', lambda e: errors.append(name + ': ' + str(e) + ' @ ' + (e.stack or '')[:600]))
     pg.on('console', lambda m: m.type == 'error' and 'ERR_TUNNEL' not in m.text and 'fonts.g' not in m.text and errors.append(name + ' console: ' + m.text))
     pg.set_default_timeout(4000)
     pg.goto(PAGE + hash_); pg.wait_for_timeout(300)
