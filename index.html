@@ -208,6 +208,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--bg); border-radius: 10px; border: 1px solid var(--line); }
 .switch input { width: 20px; height: 20px; accent-color: var(--gold); }
 
+/* 사람들과 */
+.seg.mode button { padding: 11px 10px; font-size: 14.5px; font-weight: 600; }
+.joinrow { display: flex; gap: 8px; }
+.joinrow .input { flex: 1; min-width: 0; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
+.joinrow .btn { flex: none; }
+.warn-text { color: var(--red); }
+.btn.warn { border-color: var(--red); color: var(--red); }
+.conn { font-size: 12px; color: var(--gold-ink); background: var(--gold); border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.clock { justify-self: center; font-size: 13px; font-weight: 600; color: var(--gold); font-variant-numeric: tabular-nums; padding: 2px 12px; border: 1px solid var(--gold); border-radius: 999px; }
+.clock.low { color: var(--red); border-color: var(--red); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+.chip .bar { position: absolute; left: 10px; right: 10px; top: 3px; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.chip .bar i { display: block; height: 100%; background: var(--gold); transform-origin: left center; transition: transform .25s linear; }
+.lrow.seat { grid-template-columns: 30px 1fr auto; }
+.lrow .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 12.5px; background: var(--av); color: #fff; }
+.lrow .av.ghost { background: transparent; border: 1px dashed var(--line); }
+.lrow.seat.empty .who { color: var(--muted); font-weight: 400; }
+.linkbox { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); min-width: 0; }
+.linkbox span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+.linkbox .btn { flex: none; }
 #fx { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 </style>
@@ -219,6 +239,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   <header class="top">
     <div class="brand">달무티</div>
     <div class="game-no" id="gameNo"></div>
+    <div class="conn" id="conn" hidden></div>
     <div class="sp"></div>
     <button class="icon-btn" id="rulesBtn" type="button">규칙</button>
     <button class="icon-btn" id="menuBtn" type="button">메뉴</button>
@@ -229,6 +250,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     <div class="banner" id="banner"></div>
   </section>
   <section class="me">
+    <div class="clock" id="clock" hidden></div>
     <div class="hint" id="hint"></div>
     <div class="hand" id="hand" aria-label="내 손패"></div>
     <div class="actions">
@@ -570,6 +592,27 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     return s;
   };
 
+  /* 한 사람에게 보여 줄 상태 (온라인): 남의 손패·씨앗·남끼리의 세금 카드·숨긴 혁명은 가림 */
+  DM.viewFor = function (s, seat) {
+    var v = clone(s);
+    v.seed = 0;
+    var reveal = s.phase === 'gameEnd' || s.phase === 'matchEnd';
+    v.players.forEach(function (p) {
+      p.count = DM.handSize(p.hand);
+      if (p.id !== seat && !reveal) p.hand = null;
+    });
+    if (v.tax) v.tax.pairs.forEach(function (p) {
+      if (p.from === seat || p.to === seat) return;
+      p.taken = p.taken.map(function () { return 0; });
+      if (p.given) p.given = p.given.map(function () { return 0; });
+    });
+    if (v.revolution && !v.revolution.reveal && v.revolution.pid !== seat) {
+      v.revolution = s.phase === 'revolution' ? { pid: -1, reveal: null, kind: null } : null;
+    }
+    return v;
+  };
+  DM.count = function (p) { return p.hand ? DM.handSize(p.hand) : (p.count || 0); };
+
   root.DM = DM;
   if (typeof module !== 'undefined' && module.exports) module.exports = DM;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -592,7 +635,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   };
   function maxOppCards(s, pid) {
     var m = 0;
-    s.players.forEach(function (p) { if (p.id !== pid && s.finished.indexOf(p.id) < 0) m = Math.max(m, DM.handSize(p.hand)); });
+    s.players.forEach(function (p) { if (p.id !== pid && s.finished.indexOf(p.id) < 0) m = Math.max(m, DM.count(p)); });
     return m;
   }
   // (v, t)를 내면 아무도 못 받는가?
@@ -693,7 +736,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
           var sure = AI.sureWin(s, pid, m.v, m.n + m.j);
           if (sure) { sc += 1.5; if (groups(after) <= 1 && after[13] === 0) sc += 50; if (groups(after) === 0) sc += 50; }
           // 거의 끝난 사람이 이 판을 가져가려 하면 막기
-          var lp = s.trick.by, lpLeft = DM.handSize(s.players[lp].hand);
+          var lp = s.trick.by, lpLeft = DM.count(s.players[lp]);
           if (lpLeft > 0 && lpLeft <= 2) sc += 2.5;
         }
       }
@@ -729,7 +772,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     t.players.forEach(function (p) {
       p.level = 'normal';
       if (p.id === pid) return;
-      var c = DM.handSize(p.hand); p.hand = DM.zeros();
+      var c = DM.count(p); p.hand = DM.zeros();
       for (var q = 0; q < c; q++) p.hand[pool[at++]]++;
     });
     return t;
@@ -1029,13 +1072,17 @@ function josa(word, a, b) { var c = word.charCodeAt(word.length - 1); if (c < 0x
 
 /* ───── 설정·저장 ───── */
 var settings = { name: '나', n: 5, level: 'normal', games: 5, firstTax: true, autoPass: true, sound: true };
-var S = null;        // 게임 상태
+var S = null;        // 게임 상태 (온라인이면 서버가 보내 준 내 보기)
+var ME = 0;          // 내 자리 (혼자 하기는 0, 온라인은 서버가 정함)
+var NET = null;      // 온라인 접속 정보 { code, room, offset, ... }
+var soloS = null;    // 온라인에 들어가 있는 동안 혼자 하던 판을 보관
+var SERVER = 'https://dalmuti.2juwon.workers.dev';
 var ui = { sel: {}, seenSeq: 0, block: null, taxShown: 0, revoShown: 0, timer: null };
 function load() {
   try { var d = JSON.parse(localStorage.getItem(KEY) || 'null'); if (d) { if (d.settings) Object.assign(settings, d.settings); if (d.state && d.state.v === DM.VERSION) S = d.state; if (d.ui) { ui.taxShown = d.ui.taxShown || 0; ui.revoShown = d.ui.revoShown || 0; } } } catch (e) {}
 }
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify({ settings: settings, state: S, ui: { taxShown: ui.taxShown, revoShown: ui.revoShown } })); } catch (e) {}
+  try { localStorage.setItem(KEY, JSON.stringify({ settings: settings, state: NET ? soloS : S, ui: NET ? {} : { taxShown: ui.taxShown, revoShown: ui.revoShown } })); } catch (e) {}
 }
 
 /* ───── 소리 ───── */
@@ -1084,12 +1131,12 @@ function newMatch() {
 }
 
 /* ───── 시트 ───── */
-function openSheet(html, onClose) {
-  el('sheet').innerHTML = html; el('sheetWrap').hidden = false; sheetClose = onClose || null;
+function openSheet(html, onClose, kind) {
+  el('sheet').innerHTML = html; el('sheetWrap').hidden = false; sheetClose = onClose || null; sheetKind = kind || null;
   var f = el('sheet').querySelector('[data-focus]'); if (f) setTimeout(function () { f.focus(); }, 50);
 }
-var sheetClose = null;
-function closeSheet() { el('sheetWrap').hidden = true; el('sheet').innerHTML = ''; var c = sheetClose; sheetClose = null; if (c) c(); }
+var sheetClose = null, sheetKind = null;
+function closeSheet() { el('sheetWrap').hidden = true; el('sheet').innerHTML = ''; sheetKind = null; var c = sheetClose; sheetClose = null; if (c) c(); }
 el('sheetWrap').addEventListener('click', function (e) { if (e.target === el('sheetWrap') && sheetClose !== false && el('sheet').dataset.dismiss === '1') closeSheet(); });
 
 function seg(name, opts, cur) {
@@ -1097,26 +1144,59 @@ function seg(name, opts, cur) {
     return '<button type="button" data-val="' + o[0] + '" aria-pressed="' + (String(o[0]) === String(cur)) + '">' + o[1] + '</button>';
   }).join('') + '</div>';
 }
-function showStart() {
-  var canResume = S && S.phase !== 'matchEnd';
+function showStart(joinCode) {
+  if (NET) return showLobbyOrGame();
+  var mode = joinCode ? 'online' : (settings.mode === 'online' ? 'online' : 'solo');
+  var canResume = mode === 'solo' && S && S.phase !== 'matchEnd';
   el('sheet').dataset.dismiss = canResume ? '1' : '0';
-  openSheet(
-    '<h2 class="hero">달무티</h2>' +
+  var head = '<h2 class="hero">달무티</h2>' +
     '<p class="lead">손에 든 카드를 가장 먼저 없앤 사람이 왕, 달무티가 됩니다. 늦게 털수록 계급은 내려가고, 꼴찌는 농노가 되어 다음 판에 좋은 카드를 바쳐야 하죠.</p>' +
+    '<div class="seg mode" data-mode>' + [['solo', '컴퓨터와'], ['online', '사람들과']].map(function (o) {
+      return '<button type="button" data-val="' + o[0] + '" aria-pressed="' + (o[0] === mode) + '">' + o[1] + '</button>'; }).join('') + '</div>' +
+    '<div class="field"><label for="nameIn">내 이름</label><input class="input" id="nameIn" maxlength="6" value="' + esc(settings.name) + '" autocomplete="off"></div>';
+  if (mode === 'online') {
+    openSheet(head + (SERVER ?
+      '<p class="seg-note" id="statsLine">방을 찾는 중…</p>' +
+      '<div class="btns"><button class="btn primary" id="quickBtn" type="button"' + (joinCode ? '' : ' data-focus') + '>빠른 참가</button>' +
+      '<button class="btn" id="makeBtn" type="button">친구랑 할 방 만들기</button></div>' +
+      '<div class="field"><label for="codeIn">방 번호로 들어가기</label><div class="joinrow"><input class="input" id="codeIn" inputmode="numeric" maxlength="6" placeholder="6자리 번호" value="' + (joinCode || '') + '" autocomplete="off">' +
+      '<button class="btn' + (joinCode ? ' primary' : '') + '" id="joinBtn" type="button"' + (joinCode ? ' data-focus' : '') + '>들어가기</button></div></div>' +
+      '<p class="seg-note">차례마다 제한 시간이 있어요. 시간이 지나면 자동으로 패스되고, 선일 때는 가장 약한 카드가 나가요. 빈자리는 컴퓨터가 채워요.</p>' +
+      '<div class="btns"><button class="btn ghost" id="startRules" type="button">규칙 보기</button></div>'
+      : '<p class="seg-note">사람들과 하기는 <b>2juwon.github.io/dalmuti</b> 에서 할 수 있어요. 여기서는 컴퓨터와 할 수 있어요.</p>'), null, 'start');
+    bindStartCommon();
+    if (!SERVER) return;
+    var nm = function () { settings.name = (el('nameIn').value.trim() || '나').slice(0, 6); save(); return settings.name; };
+    el('quickBtn').onclick = function () { ac(); nm(); Net.enter('quick'); };
+    el('makeBtn').onclick = function () { ac(); nm(); Net.enter('make'); };
+    el('joinBtn').onclick = function () { ac(); nm(); var c = el('codeIn').value.replace(/\D/g, ''); if (c.length !== 6) { el('codeIn').focus(); return; } Net.enter('join', c); };
+    el('codeIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') el('joinBtn').click(); });
+    Net.stats();
+    return;
+  }
+  openSheet(head +
     (canResume ? '<div class="btns"><button class="btn primary" id="resumeBtn" type="button" data-focus>이어서 하기 · ' + S.gameNo + '판째</button></div>' : '') +
-    '<div class="field"><label for="nameIn">내 이름</label><input class="input" id="nameIn" maxlength="6" value="' + esc(settings.name) + '" autocomplete="off"></div>' +
     '<div class="field"><div class="lb">인원 (나 포함)</div>' + seg('n', [[4, '4명'], [5, '5명'], [6, '6명'], [7, '7명'], [8, '8명']], settings.n) + '</div>' +
     '<div class="field"><div class="lb">컴퓨터 실력</div>' + seg('level', [['easy', '느긋한'], ['normal', '보통'], ['hard', '고수']], settings.level) + '</div>' +
     '<div class="field"><div class="lb">판 수 (계급마다 점수, 합계로 최종 순위)</div>' + seg('games', [[3, '3판'], [5, '5판'], [10, '10판'], [0, '끝없이']], settings.games) + '</div>' +
     '<div class="field"><div class="lb">첫 판</div>' + seg('firstTax', [['1', '계급대로 세금'], ['0', '평등하게']], settings.firstTax ? '1' : '0') +
     '<div class="seg-note">처음엔 카드를 한 장씩 뽑아 작은 수가 높은 계급이 돼요. ‘평등하게’를 고르면 첫 판만 세금 없이 해요.</div></div>' +
     '<div class="btns"><button class="btn ' + (canResume ? '' : 'primary') + '" id="startBtn" type="button"' + (canResume ? '' : ' data-focus') + '>' + (canResume ? '새로 시작' : '계급 뽑고 시작') + '</button>' +
-    '<button class="btn ghost" id="startRules" type="button">규칙 보기</button></div>'
+    '<button class="btn ghost" id="startRules" type="button">규칙 보기</button></div>', null, 'start'
   );
   bindSegs();
+  bindStartCommon();
   if (canResume) el('resumeBtn').onclick = function () { closeSheet(); resume(); };
   el('startBtn').onclick = function () { settings.name = el('nameIn').value.trim() || '나'; closeSheet(); newMatch(); };
-  el('startRules').onclick = function () { showRules(showStart); };
+}
+function bindStartCommon() {
+  var m = el('sheet').querySelector('[data-mode]');
+  if (m) m.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var n = el('nameIn'); if (n) settings.name = (n.value.trim() || settings.name).slice(0, 6);
+    settings.mode = b.dataset.val; save(); showStart();
+  });
+  var r = el('startRules'); if (r) r.onclick = function () { showRules(function () { showStart(); }); };
 }
 function bindSegs() {
   el('sheet').querySelectorAll('[data-seg]').forEach(function (g) {
@@ -1134,19 +1214,27 @@ function showDraw() {
   var names = DM.rankNames(S.n);
   var rows = S.ranks.map(function (pid, i) {
     var d = S.draws[pid], p = S.players[pid];
-    return '<div class="lrow' + (pid === 0 ? ' mine' : '') + '"><span class="pl">' + (i + 1) + '</span><span class="rn">' + names[i] + '</span>' +
+    return '<div class="lrow' + (pid === ME ? ' mine' : '') + '"><span class="pl">' + (i + 1) + '</span><span class="rn">' + names[i] + '</span>' +
       '<span class="who">' + esc(p.name) + '</span><span class="pt">' + (d.length > 1 ? '다시 뽑음' : '') + '</span>' + miniCards([d[d.length - 1]]) + '</div>';
   }).join('');
   el('sheet').dataset.dismiss = '0';
   openSheet('<h2>계급 뽑기</h2><p class="lead">각자 한 장씩 뽑았어요. 작은 수를 뽑을수록 높은 계급이고, 계급 순서대로 둘러앉아 달무티부터 시작해요.' +
     (S.opts.firstTax ? '' : ' 첫 판은 세금 없이 평등하게 해요.') + '</p><div class="list">' + rows + '</div>' +
-    '<div class="btns"><button class="btn primary" id="dealBtn" type="button" data-focus>카드 나누기</button></div>');
+    '<div class="btns"><button class="btn primary" id="dealBtn" type="button" data-focus>' + (NET ? '확인 · 곧 카드를 나눠요' : '카드 나누기') + '</button></div>', null, 'draw');
   render();
-  el('dealBtn').onclick = function () { closeSheet(); commit({ type: 'deal' }); };
+  el('dealBtn').onclick = function () { closeSheet(); if (!NET) commit({ type: 'deal' }); };
 }
 
 /* ───── 진행 ───── */
 function commit(a) {
+  if (NET) {
+    if (!S) return false;
+    var b = {}; for (var k in a) if (k !== 'pid') b[k] = a[k];
+    b.seq = S.seq; ui.sentSeq = S.seq; ui.sel = {};
+    Net.send({ t: 'act', a: b });
+    renderHand();
+    return true;
+  }
   try { S = DM.apply(S, a); }
   catch (e) { hint(e.message, true); return false; }
   ui.sel = {};
@@ -1168,8 +1256,8 @@ function react(news) {
   news.forEach(function (e) {
     if (e.t === 'play') { flyFrom = e.pid; sfx('play'); }
     else if (e.t === 'pass') sfx('pass');
-    else if (e.t === 'clear') { sweep = S.prevTrick; sfx('clear'); banner(e.pid === 0 ? '모두 패스 · 내가 선' : '모두 패스 · ' + S.players[e.pid].name + ' 선', true); }
-    else if (e.t === 'out') { sfx('out'); banner(e.pid === 0 ? e.place + '등으로 다 털었어요!' : josa(S.players[e.pid].name, '이', '가') + ' ' + e.place + '등!', e.pid !== 0); }
+    else if (e.t === 'clear') { sweep = S.prevTrick; sfx('clear'); banner(e.pid === ME ? '모두 패스 · 내가 선' : '모두 패스 · ' + S.players[e.pid].name + ' 선', true); }
+    else if (e.t === 'out') { sfx('out'); banner(e.pid === ME ? e.place + '등으로 다 털었어요!' : josa(S.players[e.pid].name, '이', '가') + ' ' + e.place + '등!', e.pid !== ME); }
     else if (e.t === 'revolution') { sfx('revo'); }
     else if (e.t === 'end') { setTimeout(showResult, window.__dalmutiFast ? 20 : 900); }
   });
@@ -1182,6 +1270,11 @@ function banner(t, small) {
 
 function schedule() {
   clearTimeout(ui.timer);
+  if (NET) {
+    var q = S && DM.pending(S);
+    if (q && q.pid === ME && ui.turnSeq !== S.seq && !(q.kind === 'play' && S.trick && !DM.moves(S, ME).length)) { ui.turnSeq = S.seq; sfx('turn'); }
+    return;
+  }
   if (!S || !el('sheetWrap').hidden) return;
   if (blockingPrompt()) return;
   var p = DM.pending(S);
@@ -1198,19 +1291,19 @@ function schedule() {
       if (a) commit(a);
     }, delay);
   } else if (p.kind === 'play') {
-    if (settings.autoPass && S.trick && DM.moves(S, 0).length === 0) {
-      ui.timer = setTimeout(function () { if (S.turn === 0 && S.trick) { commit({ type: 'pass', pid: 0 }); banner('낼 수 있는 카드가 없어 패스', true); } }, window.__dalmutiFast ? 15 : 900);
+    if (settings.autoPass && S.trick && DM.moves(S, ME).length === 0) {
+      ui.timer = setTimeout(function () { if (S.turn === ME && S.trick) { commit({ type: 'pass', pid: ME }); banner('낼 수 있는 카드가 없어 패스', true); } }, window.__dalmutiFast ? 15 : 900);
     } else sfx('turn');
   }
 }
 // 사람이 확인해야 다음으로 넘어가는 탁자 알림
 function blockingPrompt() {
-  if (!S) return false;
+  if (!S || NET) return false;
   if (S.phase === 'play' && S.revolution && S.revolution.reveal && ui.revoShown !== S.gameNo) return true;
   if (S.phase === 'play' && S.tax && ui.taxShown !== S.gameNo && involved()) return true;
   return false;
 }
-function involved() { return S.tax && S.tax.pairs.some(function (p) { return p.from === 0 || p.to === 0; }); }
+function involved() { return S.tax && S.tax.pairs.some(function (p) { return p.from === ME || p.to === ME; }); }
 
 /* ───── 그리기 ───── */
 function render() {
@@ -1219,16 +1312,18 @@ function render() {
   el('gameNo').textContent = S.gameNo ? (S.games ? S.gameNo + ' / ' + S.games + '판' : S.gameNo + '판째') : '';
   // 궁정
   var court = el('court'); court.style.setProperty('--n', S.n); court.dataset.n = S.n;
+  var pend0 = DM.pending(S), actor = pend0 ? pend0.pid : -1;
   court.innerHTML = (S.ranks || S.players.map(function (p) { return p.id; })).map(function (pid, i) {
     var p = S.players[pid], st = S.status[pid], place = S.finished.indexOf(pid);
     var say = '';
     if (place >= 0 && S.phase === 'play') say = '<span class="say place">' + (place + 1) + '등</span>';
     else if (st && S.phase === 'play') say = st.t === 'pass' ? '<span class="say">패스</span>' : '<span class="say play">' + (st.v === 13 ? '광대' : st.v) + '×' + (st.n + st.j) + '</span>';
-    var cls = 'chip' + (pid === 0 ? ' me' : '') + (S.phase === 'play' && S.turn === pid ? ' turn' : '') + (place >= 0 && S.phase === 'play' ? ' out' : '');
+    var cls = 'chip' + (pid === ME ? ' me' : '') + (S.phase === 'play' && S.turn === pid ? ' turn' : '') + (place >= 0 && S.phase === 'play' ? ' out' : '');
     return '<div class="' + cls + '" data-pid="' + pid + '"><span class="rk' + (i === 0 ? ' r0' : '') + '">' + names[i] + '</span>' +
       '<span class="av" style="--av:' + AVATAR[pid % AVATAR.length] + '">' + esc(p.name.slice(0, 1)) + '</span>' +
-      '<span class="nm">' + esc(pid === 0 ? p.name + ' (나)' : p.name) + '</span>' +
-      '<span class="ct">' + (S.phase === 'drawn' || S.phase === 'draw' ? '' : DM.handSize(p.hand) + '장') + '</span>' + say + '</div>';
+      '<span class="nm">' + esc(pid === ME ? p.name + ' (나)' : p.name) + '</span>' +
+      '<span class="ct">' + (S.phase === 'drawn' || S.phase === 'draw' ? '' : DM.count(p) + '장') + seatNote(pid) + '</span>' + say +
+      (NET && actor === pid && NET.room.deadline ? '<span class="bar"><i></i></span>' : '') + '</div>';
   }).join('');
   renderCenter();
   renderHand();
@@ -1238,21 +1333,21 @@ function renderCenter() {
   var c = el('center'), pend = DM.pending(S);
   // 혁명 결정 (내가 어릿광대 2장)
   if (S.phase === 'revolution') {
-    if (pend.pid === 0) {
-      var r = S.ranks.indexOf(0), names = DM.rankNames(S.n), great = r === S.n - 1;
+    if (pend.pid === ME) {
+      var r = S.ranks.indexOf(ME), names = DM.rankNames(S.n), great = r === S.n - 1;
       c.innerHTML = '<div class="prompt"><h3>어릿광대 두 장이 모두 들어왔어요</h3>' + miniCards([13, 13]) +
         '<p>' + (great ? '농노가 공개하면 <b>대혁명</b>이에요. 계급이 거꾸로 뒤집혀 내가 달무티가 되고, 이번 판은 세금이 없어요.'
           : r <= 1 ? '공개하면 이번 판 세금이 없어져요. 지금 ' + names[r] + '라서 세금을 받는 쪽이니, 숨기는 편이 이득일 수 있어요.'
           : '공개하면 이번 판은 세금 없이 모두 그대로 해요. 대신 내 손에 어릿광대 둘이 있다는 걸 모두가 알게 돼요.') + '</p>' +
         '<div class="row"><button class="btn primary sm" id="revYes" type="button">공개 · ' + (great ? '대혁명!' : '혁명') + '</button><button class="btn sm" id="revNo" type="button">숨기기</button></div></div>';
-      el('revYes').onclick = function () { commit({ type: 'revolution', pid: 0, reveal: true }); };
-      el('revNo').onclick = function () { commit({ type: 'revolution', pid: 0, reveal: false }); };
+      el('revYes').onclick = function () { commit({ type: 'revolution', pid: ME, reveal: true }); };
+      el('revNo').onclick = function () { commit({ type: 'revolution', pid: ME, reveal: false }); };
     } else c.innerHTML = '<div class="empty-msg">카드를 나눴어요<small>세금을 걷기 전이에요</small></div>';
     return;
   }
   if (S.phase === 'taxReturn') {
-    var mine = S.tax.pairs.filter(function (p) { return p.to === 0 && !p.given; })[0];
-    if (mine && pend.pid === 0) {
+    var mine = S.tax.pairs.filter(function (p) { return p.to === ME && !p.given; })[0];
+    if (mine && pend.pid === ME) {
       var giver = S.players[mine.from].name, nm = DM.rankNames(S.n)[S.ranks.indexOf(mine.from)];
       c.innerHTML = '<div class="prompt"><h3>' + esc(nm) + ' ' + esc(giver) + '의 조공</h3>' + miniCards(mine.taken) +
         '<p>가장 좋은 카드 ' + mine.k + '장을 받았어요. 이제 손패에서 <b>필요 없는 카드 ' + mine.k + '장</b>을 골라 돌려주세요. 낱장으로 남은 큰 수가 보통 가장 쓸모없어요.</p>' +
@@ -1264,26 +1359,27 @@ function renderCenter() {
     } else c.innerHTML = '<div class="empty-msg">세금을 걷는 중<small>' + taxSummaryLine() + '</small></div>';
     return;
   }
-  if (S.phase === 'play' && S.revolution && S.revolution.reveal && ui.revoShown !== S.gameNo) {
+  var quiet = NET && (S.trickPlays.length || S.prevTrick);
+  if (S.phase === 'play' && S.revolution && S.revolution.reveal && ui.revoShown !== S.gameNo && !quiet) {
     var who = S.players[S.revolution.pid].name, great2 = S.revolution.kind === 'great';
     c.innerHTML = '<div class="prompt"><h3>' + (great2 ? '대혁명!' : '혁명!') + '</h3>' + miniCards([13, 13]) +
-      '<p>' + (S.revolution.pid === 0 ? '내가' : josa(who, '이', '가')) + ' 어릿광대 두 장을 공개했어요. ' +
-      (great2 ? '농노의 대혁명으로 계급이 모두 뒤집혔어요. ' + (S.ranks[0] === 0 ? '이제 내가 달무티예요.' : esc(S.players[S.ranks[0]].name) + '이(가) 새 달무티예요.') + ' 세금은 없어요.'
+      '<p>' + (S.revolution.pid === ME ? '내가' : josa(who, '이', '가')) + ' 어릿광대 두 장을 공개했어요. ' +
+      (great2 ? '농노의 대혁명으로 계급이 모두 뒤집혔어요. ' + (S.ranks[0] === ME ? '이제 내가 달무티예요.' : esc(S.players[S.ranks[0]].name) + '이(가) 새 달무티예요.') + ' 세금은 없어요.'
         : '계급은 그대로지만 이번 판은 세금 없이 해요.') + '</p>' +
-      '<div class="row"><button class="btn primary sm" id="revOk" type="button">시작하기</button></div></div>';
+      '<div class="row"><button class="btn primary sm" id="revOk" type="button">' + (NET ? '확인' : '시작하기') + '</button></div></div>';
     el('revOk').onclick = function () { ui.revoShown = S.gameNo; save(); render(); schedule(); };
     if (!ui.revoBanner || ui.revoBanner !== S.gameNo) { ui.revoBanner = S.gameNo; banner(great2 ? '대혁명!' : '혁명!'); }
     return;
   }
-  if (S.phase === 'play' && S.tax && ui.taxShown !== S.gameNo && involved()) {
+  if (S.phase === 'play' && S.tax && ui.taxShown !== S.gameNo && involved() && !quiet) {
     var lines = S.tax.pairs.map(function (p) {
       var a = S.players[p.from].name, b = S.players[p.to].name;
-      if (p.from === 0) return '<div class="tx-line">바친 카드 → <b>' + esc(b) + '</b> ' + miniCards(p.taken) + '</div><div class="tx-line">돌려받은 카드 ' + miniCards(p.given) + '</div>';
-      if (p.to === 0) return '<div class="tx-line">받은 카드 ← <b>' + esc(a) + '</b> ' + miniCards(p.taken) + '</div><div class="tx-line">돌려준 카드 ' + miniCards(p.given) + '</div>';
+      if (p.from === ME) return '<div class="tx-line">바친 카드 → <b>' + esc(b) + '</b> ' + miniCards(p.taken) + '</div><div class="tx-line">돌려받은 카드 ' + miniCards(p.given) + '</div>';
+      if (p.to === ME) return '<div class="tx-line">받은 카드 ← <b>' + esc(a) + '</b> ' + miniCards(p.taken) + '</div><div class="tx-line">돌려준 카드 ' + miniCards(p.given) + '</div>';
       return '<div class="tx-line"><b>' + esc(a) + '</b> → <b>' + esc(b) + '</b> ' + p.k + '장 바치고 돌려받음</div>';
     }).join('');
     c.innerHTML = '<div class="prompt"><h3>세금을 걷었어요</h3><div class="tx">' + lines + '</div>' +
-      '<div class="row"><button class="btn primary sm" id="taxOk" type="button">시작하기</button></div></div>';
+      '<div class="row"><button class="btn primary sm" id="taxOk" type="button">' + (NET ? '확인' : '시작하기') + '</button></div></div>';
     el('taxOk').onclick = function () { ui.taxShown = S.gameNo; save(); render(); schedule(); };
     return;
   }
@@ -1293,19 +1389,19 @@ function renderCenter() {
   var tr = S.trickPlays, last = tr[tr.length - 1];
   if (last) {
     html += '<div class="trick" id="trick">' + playCards(last) + '</div>';
-    html += '<div class="tlabel"><b>' + esc(last.pid === 0 ? '나' : S.players[last.pid].name) + '</b> · ' + moveText(last) + '</div>';
-    if (tr.length > 1) html += '<div class="trail">' + tr.slice(0, -1).slice(-5).map(function (p) { return '<span>' + esc(p.pid === 0 ? '나' : S.players[p.pid].name) + ' ' + (p.v === 13 ? '광대' : p.v) + '×' + p.count + '</span>'; }).join('<span>›</span>') + '</div>';
+    html += '<div class="tlabel"><b>' + esc(last.pid === ME ? '나' : S.players[last.pid].name) + '</b> · ' + moveText(last) + '</div>';
+    if (tr.length > 1) html += '<div class="trail">' + tr.slice(0, -1).slice(-5).map(function (p) { return '<span>' + esc(p.pid === ME ? '나' : S.players[p.pid].name) + ' ' + (p.v === 13 ? '광대' : p.v) + '×' + p.count + '</span>'; }).join('<span>›</span>') + '</div>';
   } else if (sweep) {
     var sl = sweep.plays[sweep.plays.length - 1];
-    html += '<div class="trick sweep" id="trick">' + playCards(sl) + '</div><div class="tlabel">' + (S.turn === 0 ? '<b>내가 선</b> · 무엇이든 낼 수 있어요' : '<b>' + esc(S.players[S.turn].name) + '</b> 선') + '</div>';
+    html += '<div class="trick sweep" id="trick">' + playCards(sl) + '</div><div class="tlabel">' + (S.turn === ME ? '<b>내가 선</b> · 무엇이든 낼 수 있어요' : '<b>' + esc(S.players[S.turn].name) + '</b> 선') + '</div>';
   } else {
     var lead = S.players[S.turn];
-    html += '<div class="empty-msg">' + (S.turn === 0 ? '내가 선이에요' : esc(lead.name) + ' 선') + '<small>같은 숫자 카드를 원하는 만큼 낼 수 있어요</small></div>';
+    html += '<div class="empty-msg">' + (S.turn === ME ? '내가 선이에요' : esc(lead.name) + ' 선') + '<small>같은 숫자 카드를 원하는 만큼 낼 수 있어요</small></div>';
   }
   c.innerHTML = html;
   if (sweep) { var sw = sweep; setTimeout(function () { if (sweep === sw) { sweep = null; if (!S.trickPlays.length) renderCenter(); } }, 700); }
   if (last && flyFrom != null) {
-    var t = el('trick'), from = flyFrom === 0 ? el('hand') : el('court').querySelector('[data-pid="' + flyFrom + '"]');
+    var t = el('trick'), from = flyFrom === ME ? el('hand') : el('court').querySelector('[data-pid="' + flyFrom + '"]');
     flyFrom = null;
     if (t && from) {
       var a = from.getBoundingClientRect(), b = t.getBoundingClientRect();
@@ -1327,8 +1423,8 @@ function taxSummaryLine() {
 
 /* ───── 손패 ───── */
 function giveMode() {
-  if (S.phase !== 'taxReturn') return null;
-  var p = DM.pending(S); if (!p || p.pid !== 0) return null;
+  if (!S || S.phase !== 'taxReturn' || (NET && ui.sentSeq === S.seq)) return null;
+  var p = DM.pending(S); if (!p || p.pid !== ME) return null;
   return p;
 }
 function selTotal() { var t = 0; for (var k in ui.sel) t += ui.sel[k]; return t; }
@@ -1340,8 +1436,8 @@ function selMove() {
   return v ? { v: v, n: n, j: j } : { v: 13, n: 0, j: j };
 }
 function renderHand() {
-  var h = S.players[0].hand, g = giveMode(), myTurn = S.phase === 'play' && S.turn === 0 && !blockingPrompt();
-  var out = S.finished.indexOf(0) >= 0;
+  var h = S.players[ME].hand, g = giveMode(), myTurn = S.phase === 'play' && S.turn === ME && !blockingPrompt() && !(NET && ui.sentSeq === S.seq);
+  var out = S.finished.indexOf(ME) >= 0;
   var html = '';
   for (var v = 1; v <= 13; v++) {
     if (!h[v]) continue;
@@ -1351,7 +1447,7 @@ function renderHand() {
     html += '<button type="button" class="stack' + (picked ? ' sel' : '') + (dim ? ' dim' : '') + '" data-v="' + v + '" style="--pile:' + (sh.join(',') || '0 0 0 transparent') + '" aria-label="' + (v === 13 ? '어릿광대' : v) + ' ' + h[v] + '장">' +
       cardHTML(v) + (h[v] > 1 ? '<span class="badge">' + h[v] + '</span>' : '') + (picked ? '<span class="pick">' + picked + '</span>' : '') + '</button>';
   }
-  el('hand').innerHTML = html || '<div class="empty-msg">' + (S.phase === 'drawn' || S.phase === 'draw' ? '' : '손패를 다 털었어요<small>' + (S.finished.indexOf(0) + 1) + '등 · 남은 사람들을 지켜보세요</small>') + '</div>';
+  el('hand').innerHTML = html || '<div class="empty-msg">' + (S.phase === 'drawn' || S.phase === 'draw' ? '' : '손패를 다 털었어요<small>' + (S.finished.indexOf(ME) + 1) + '등 · 남은 사람들을 지켜보세요</small>') + '</div>';
 
   var pass = el('passBtn'), play = el('playBtn');
   if (g) {
@@ -1368,13 +1464,13 @@ function renderHand() {
     } else if (S.phase === 'revolution' || S.phase === 'taxReturn') hint(''); else hint('');
     return;
   }
-  var m = selMove(), err = m ? DM.check(S, 0, m) : '카드를 고르세요';
+  var m = selMove(), err = m ? DM.check(S, ME, m) : '카드를 고르세요';
   pass.disabled = !S.trick;
   play.disabled = !!err;
   play.textContent = m && !err ? '내기 · ' + moveText(m) : '내기';
   if (S.trick) {
     var need = S.trick.v === 13 ? '어릿광대(13)' : S.trick.v;
-    if (!DM.moves(S, 0).length) hint('낼 수 있는 카드가 없어요. <b>패스</b>하세요');
+    if (!DM.moves(S, ME).length) hint('낼 수 있는 카드가 없어요. <b>패스</b>하세요');
     else hint(m && err ? err : '<b>' + need + '보다 작은 수 ' + S.trick.count + '장</b>을 내거나 패스');
   } else hint(m && err ? err : '<b>내가 선</b> · 같은 숫자를 원하는 만큼 (어릿광대를 섞으면 그 수가 돼요)');
 }
@@ -1384,14 +1480,14 @@ function shake(v) { var b = el('hand').querySelector('[data-v="' + v + '"]'); if
 el('hand').addEventListener('click', function (e) {
   var b = e.target.closest('.stack'); if (!b || !S) return;
   ac();
-  var v = +b.dataset.v, h = S.players[0].hand, g = giveMode();
+  var v = +b.dataset.v, h = S.players[ME].hand, g = giveMode();
   if (g) {
     var t = selTotal();
     if ((ui.sel[v] || 0) < h[v] && t < g.k) ui.sel[v] = (ui.sel[v] || 0) + 1;
     else delete ui.sel[v];
     renderHand(); return;
   }
-  if (!(S.phase === 'play' && S.turn === 0) || blockingPrompt()) { shake(v); return; }
+  if (!(S.phase === 'play' && S.turn === ME) || blockingPrompt() || (NET && ui.sentSeq === S.seq)) { shake(v); return; }
   var tr = S.trick, cur = selMove();
   if (v === 13) {
     if (tr) {
@@ -1419,15 +1515,16 @@ el('hand').addEventListener('click', function (e) {
 });
 el('playBtn').addEventListener('click', function () {
   ac();
+  if (!S) return;
   var g = giveMode();
   if (g) {
     var cards = []; for (var k in ui.sel) for (var i = 0; i < ui.sel[k]; i++) cards.push(+k);
-    commit({ type: 'giveBack', pid: 0, cards: cards }); return;
+    commit({ type: 'giveBack', pid: ME, cards: cards }); return;
   }
   var m = selMove(); if (!m) return;
-  commit({ type: 'play', pid: 0, v: m.v, n: m.n, j: m.j });
+  commit({ type: 'play', pid: ME, v: m.v, n: m.n, j: m.j });
 });
-el('passBtn').addEventListener('click', function () { ac(); commit({ type: 'pass', pid: 0 }); });
+el('passBtn').addEventListener('click', function () { ac(); if (S) commit({ type: 'pass', pid: ME }); });
 
 /* ───── 결과 ───── */
 function showResult() {
@@ -1437,10 +1534,10 @@ function showResult() {
   var names = DM.rankNames(S.n), r = S.lastResult, final = S.phase === 'matchEnd';
   var rows = r.order.map(function (pid, i) {
     var p = S.players[pid];
-    return '<div class="lrow' + (pid === 0 ? ' mine' : '') + '"><span class="pl">' + (i + 1) + '</span><span class="rn">' + names[i] + '</span><span class="who">' + esc(p.name) + '</span>' +
+    return '<div class="lrow' + (pid === ME ? ' mine' : '') + '"><span class="pl">' + (i + 1) + '</span><span class="rn">' + names[i] + '</span><span class="who">' + esc(p.name) + '</span>' +
       '<span class="pt">+' + (S.n - 1 - i) + '</span><span class="tot">' + p.score + '점</span></div>';
   }).join('');
-  var myPlace = r.order.indexOf(0), prevRank = r.prevRanks.indexOf(0);
+  var myPlace = r.order.indexOf(ME), prevRank = r.prevRanks.indexOf(ME);
   var mood = myPlace === 0 ? '달무티 자리에 올랐어요!' : myPlace === S.n - 1 ? '이번 판은 농노예요. 다음 판엔 좋은 카드 2장을 바쳐야 해요.' :
     (myPlace < prevRank ? '계급이 올랐어요.' : myPlace > prevRank ? '계급이 내려갔어요.' : '계급을 지켰어요.') + ' 다음 판은 ' + names[myPlace] + '.';
   var html = '<h2>' + S.gameNo + '판 결과</h2><p class="lead">' + (r.revolution === 'great' ? '대혁명이 있었던 판이에요. ' : '') + mood + '</p><div class="list">' + rows + '</div>';
@@ -1448,21 +1545,42 @@ function showResult() {
     var st = DM.standings(S), win = st[0];
     html += '<h2 style="font-size:20px">최종 순위</h2><div class="list">' + st.map(function (pid, i) {
       var p = S.players[pid];
-      return '<div class="lrow' + (pid === 0 ? ' mine' : '') + '"><span class="pl">' + (i + 1) + '</span><span class="rn">' + (i === 0 ? '위대한 달무티' : '') + '</span><span class="who">' + esc(p.name) + '</span><span class="pt">' + p.hist.filter(function (x) { return x === 0; }).length + '번 왕</span><span class="tot">' + p.score + '점</span></div>';
+      return '<div class="lrow' + (pid === ME ? ' mine' : '') + '"><span class="pl">' + (i + 1) + '</span><span class="rn">' + (i === 0 ? '위대한 달무티' : '') + '</span><span class="who">' + esc(p.name) + '</span><span class="pt">' + p.hist.filter(function (x) { return x === 0; }).length + '번 왕</span><span class="tot">' + p.score + '점</span></div>';
     }).join('') + '</div>';
-    html += '<div class="btns"><button class="btn primary" id="againBtn" type="button" data-focus>같은 설정으로 다시</button><button class="btn" id="setupBtn" type="button">설정 바꾸기</button></div>';
     el('sheet').dataset.dismiss = '0';
-    openSheet(html);
-    el('againBtn').onclick = function () { closeSheet(); newMatch(); };
-    el('setupBtn').onclick = function () { closeSheet(); S = null; save(); showStart(); };
-    if (win === 0) { sfx('win'); confetti(); }
+    if (NET) {
+      var host = NET.room.host === ME;
+      html += '<div class="btns">' + (host ? '<button class="btn primary" id="againBtn" type="button" data-focus>같은 방에서 한 번 더</button>'
+        : '<p class="seg-note" style="text-align:center">방장이 한 번 더 하기를 누르면 대기실로 모여요</p>') +
+        '<button class="btn" id="leaveBtn" type="button">방 나가기</button></div>';
+      openSheet(html, null, 'result');
+      if (host) el('againBtn').onclick = function () { this.disabled = true; Net.send({ t: 'again' }); };
+      el('leaveBtn').onclick = function () { Net.leave(); };
+    } else {
+      html += '<div class="btns"><button class="btn primary" id="againBtn" type="button" data-focus>같은 설정으로 다시</button><button class="btn" id="setupBtn" type="button">설정 바꾸기</button></div>';
+      openSheet(html, null, 'result');
+      el('againBtn').onclick = function () { closeSheet(); newMatch(); };
+      el('setupBtn').onclick = function () { closeSheet(); S = null; save(); showStart(); };
+    }
+    if (win === ME && ui.cheered !== 'm' + S.gameNo) { ui.cheered = 'm' + S.gameNo; sfx('win'); confetti(); }
   } else {
-    html += '<p class="seg-note">계급 순서대로 다시 앉아요. 다음 판엔 농노가 달무티에게 2장, 소작농이 총리대신에게 1장을 바쳐요.</p>' +
-      '<div class="btns"><button class="btn primary" id="nextBtn" type="button" data-focus>다음 판</button></div>';
+    html += '<p class="seg-note">계급 순서대로 다시 앉아요. 다음 판엔 농노가 달무티에게 2장, 소작농이 총리대신에게 1장을 바쳐요.</p>';
     el('sheet').dataset.dismiss = '0';
-    openSheet(html);
-    el('nextBtn').onclick = function () { closeSheet(); commit({ type: 'nextGame' }); };
-    if (myPlace === 0) { sfx('win'); confetti(); }
+    if (NET) {
+      var seats = NET.room.seats, want = 0, done = 0;
+      seats.forEach(function (x) { if (x.kind === 'human' && x.online && !x.away) { want++; if (x.ready) done++; } });
+      var mine = seats[ME] && seats[ME].ready;
+      html += '<div class="btns"><button class="btn primary" id="nextBtn" type="button" data-focus' + (mine ? ' disabled' : '') + '>' + (mine ? '다른 사람 기다리는 중' : '다음 판 준비') + '</button>' +
+        '<p class="seg-note" style="text-align:center"><span id="nextClock"></span> · 준비 ' + done + '/' + want + '명</p></div>';
+      openSheet(html, null, 'result');
+      el('nextBtn').onclick = function () { Net.send({ t: 'ready' }); this.disabled = true; this.textContent = '다른 사람 기다리는 중'; };
+      tick();
+    } else {
+      html += '<div class="btns"><button class="btn primary" id="nextBtn" type="button" data-focus>다음 판</button></div>';
+      openSheet(html, null, 'result');
+      el('nextBtn').onclick = function () { closeSheet(); commit({ type: 'nextGame' }); };
+    }
+    if (myPlace === 0 && ui.cheered !== 'g' + S.gameNo) { ui.cheered = 'g' + S.gameNo; sfx('win'); confetti(); }
   }
 }
 
@@ -1471,13 +1589,18 @@ function showMenu() {
   el('sheet').dataset.dismiss = '1';
   openSheet('<h2>메뉴</h2>' +
     '<label class="switch"><span>효과음</span><input type="checkbox" id="sndIn"' + (settings.sound ? ' checked' : '') + '></label>' +
-    '<label class="switch"><span>낼 게 없으면 자동 패스</span><input type="checkbox" id="apIn"' + (settings.autoPass ? ' checked' : '') + '></label>' +
-    '<div class="btns"><button class="btn" id="mRules" type="button">규칙 보기</button><button class="btn" id="mNew" type="button">새 게임</button><button class="btn primary" id="mClose" type="button" data-focus>계속하기</button></div>',
-    function () { schedule(); });
+    (NET ? '' : '<label class="switch"><span>낼 게 없으면 자동 패스</span><input type="checkbox" id="apIn"' + (settings.autoPass ? ' checked' : '') + '></label>') +
+    (NET ? '<p class="seg-note">방 번호 <b>' + NET.code + '</b>' + (NET.room ? ' · 제한 시간 ' + NET.room.settings.turnSec + '초' : '') + '</p>' : '') +
+    '<div class="btns"><button class="btn" id="mRules" type="button">규칙 보기</button><button class="btn" id="mNew" type="button">' + (NET ? '방 나가기' : '새 게임') + '</button><button class="btn primary" id="mClose" type="button" data-focus>계속하기</button></div>',
+    afterSheet, 'menu');
   el('sndIn').onchange = function () { settings.sound = this.checked; save(); };
-  el('apIn').onchange = function () { settings.autoPass = this.checked; save(); };
+  if (el('apIn')) el('apIn').onchange = function () { settings.autoPass = this.checked; save(); };
   el('mRules').onclick = function () { showRules(showMenu); };
-  el('mNew').onclick = function () { sheetClose = null; showStart(); };
+  el('mNew').onclick = function () {
+    if (!NET) { sheetClose = null; showStart(); return; }
+    if (this.dataset.sure) { sheetClose = null; Net.leave(); return; }
+    this.dataset.sure = '1'; this.textContent = '정말 나가기 · 내 자리는 컴퓨터가 이어서 해요'; this.classList.add('warn');
+  };
   el('mClose').onclick = closeSheet;
 }
 function showRules(back) {
@@ -1492,13 +1615,14 @@ function showRules(back) {
     '<h4>계급과 세금</h4><ul><li>먼저 다 턴 순서대로 달무티 · 총리대신 · 상인 · 소작농 · 농노가 되고, 계급 순서로 앉아 달무티부터 시작해요.</li>' +
     '<li>카드를 나누면 <b>농노는 가장 작은 숫자 2장을 달무티에게</b>, <b>소작농은 1장을 총리대신에게</b> 바쳐요. 받은 사람은 아무 카드나 같은 장수만큼 돌려줘요.</li><li>80장이 똑같이 안 나눠지면 낮은 계급부터 한 장씩 더 받아요.</li></ul>' +
     '<h4>혁명</h4><ul><li>어릿광대 2장을 모두 받은 사람은 세금 전에 공개할 수 있어요.</li><li><b>농노</b>가 공개하면 <b>대혁명</b>: 계급이 거꾸로 뒤집히고 세금이 없어요.</li><li>다른 사람이 공개하면 계급은 그대로, 이번 판만 세금이 없어요.</li></ul>' +
+    '<h4>사람들과 하기</h4><ul><li>차례마다 제한 시간이 있어요(방장이 10~60초로 정해요). 시간이 지나면 자동으로 패스되고, 선이라 패스할 수 없을 때는 가장 약한 묶음이 나가요. 세금으로 돌려줄 카드는 추천 카드가, 혁명은 ‘숨기기’가 골라져요.</li><li>두 번 연속 시간을 넘기면 자리 비움으로 보고 컴퓨터가 대신 해요. 아무거나 누르면 돌아와요.</li><li>낼 수 있는 카드가 없으면 잠깐 뒤 자동으로 패스돼요.</li></ul>' +
     '<h4>점수</h4><p>판마다 꼴찌 0점부터 한 계급 위로 1점씩(5명이면 달무티 4점). 정한 판 수가 끝나면 합계가 가장 높은 사람이 최종 승자예요.</p>' +
     '<p class="seg-note">규칙은 나무위키 「달무티」 문서를 따랐어요. 상인끼리 카드를 바꾸는 선택 규칙은 넣지 않았어요.</p>' +
-    '</div><div class="btns"><button class="btn primary" id="rBack" type="button" data-focus>' + (back ? '돌아가기' : '닫기') + '</button></div>', function () { schedule(); });
+    '</div><div class="btns"><button class="btn primary" id="rBack" type="button" data-focus>' + (back ? '돌아가기' : '닫기') + '</button></div>', afterSheet, 'rules');
   el('rBack').onclick = function () { if (back) { sheetClose = null; back(); } else closeSheet(); };
 }
-el('menuBtn').onclick = function () { ac(); clearTimeout(ui.timer); showMenu(); };
-el('rulesBtn').onclick = function () { clearTimeout(ui.timer); showRules(null); };
+el('menuBtn').onclick = function () { ac(); clearTimeout(ui.timer); if (sheetKind === 'joining') return; showMenu(); };
+el('rulesBtn').onclick = function () { clearTimeout(ui.timer); if (sheetKind === 'joining') return; showRules(null); };
 
 /* ───── 색종이 ───── */
 function confetti() {
@@ -1514,15 +1638,230 @@ function confetti() {
   })(t0);
 }
 
+/* ───── 사람들과 (온라인) ───── */
+var ROOM_KEY = 'dalmuti-room', PID_KEY = 'dalmuti-pid', memPid = null, startNote = '';
+function newUi() { return { sel: {}, seenSeq: 0, block: null, taxShown: 0, revoShown: 0, timer: null }; }
+function hex(n) {
+  var a = new Uint8Array(n);
+  try { crypto.getRandomValues(a); } catch (e) { for (var i = 0; i < n; i++) a[i] = Math.random() * 256; }
+  return Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+}
+function myPid() {
+  try {
+    var p = localStorage.getItem(PID_KEY);
+    if (!/^[a-f0-9]{32}$/.test(p || '')) { p = hex(16); localStorage.setItem(PID_KEY, p); }
+    return p;
+  } catch (e) { return memPid || (memPid = hex(16)); }
+}
+function seatNote(pid) {
+  if (!NET || !NET.room) return '';
+  var x = NET.room.seats[pid];
+  if (!x) return '';
+  if (x.kind === 'human' && !x.online) return ' · 끊김';
+  if (x.away) return ' · 자리 비움';
+  return '';
+}
+function showConn(t) { var c = el('conn'); c.textContent = t; c.hidden = false; }
+function hideConn() { el('conn').hidden = true; }
+function clearTable() {
+  el('court').innerHTML = ''; el('gameNo').textContent = '';
+  el('center').innerHTML = NET ? '<div class="empty-msg">대기실<small>방장이 시작하면 계급을 뽑아요</small></div>' : '';
+  el('hand').innerHTML = ''; hint('');
+  el('passBtn').disabled = true; el('playBtn').disabled = true; el('playBtn').textContent = '내기';
+  el('clock').hidden = true;
+}
+function afterSheet() {
+  if (NET && NET.room && NET.room.status === 'waiting') showLobby();
+  else if (NET && S && (S.phase === 'gameEnd' || S.phase === 'matchEnd')) showResult();
+  else schedule();
+}
+function showLobbyOrGame() {
+  if (NET && NET.room && NET.room.status === 'waiting') showLobby(); else if (sheetKind === 'start') closeSheet();
+}
+
+// 남은 시간: 차례인 사람 칩의 막대, 내 차례면 손패 위에 초, 결과 화면엔 다음 판까지
+function tick() {
+  if (!NET || !NET.room) return;
+  var dl = NET.room.deadline, left = dl ? Math.max(0, dl - (Date.now() + NET.offset)) : 0;
+  var total = (NET.room.settings.turnSec || 20) * 1000;
+  var bar = document.querySelector('.chip .bar i');
+  if (bar) bar.style.transform = 'scaleX(' + Math.min(1, left / total).toFixed(3) + ')';
+  var q = S && S.phase !== 'gameEnd' && S.phase !== 'matchEnd' && DM.pending(S);
+  var mine = q && q.pid === ME && dl && ui.sentSeq !== S.seq;
+  var ck = el('clock');
+  if (mine) {
+    var sec = Math.ceil(left / 1000);
+    ck.hidden = false; ck.textContent = '남은 시간 ' + sec + '초';
+    ck.classList.toggle('low', sec <= 5);
+    if (sec <= 5 && sec > 0 && ui.beep !== S.seq + ':' + sec) { ui.beep = S.seq + ':' + sec; tone(1320, .06, 'sine', .05); }
+  } else ck.hidden = true;
+  var nc = el('nextClock');
+  if (nc) nc.textContent = dl ? '다음 판까지 ' + Math.ceil(left / 1000) + '초' : '';
+}
+setInterval(tick, 250);
+
+function showLobby() {
+  var r = NET.room, host = r.host === ME, st = r.settings;
+  var humans = r.seats.filter(function (x) { return x.kind === 'human'; }).length, empty = r.seats.length - humans;
+  var link = location.origin + location.pathname + '#' + r.code;
+  var rows = r.seats.map(function (x, i) {
+    if (x.kind !== 'human') return '<div class="lrow seat empty"><span class="av ghost"></span><span class="who">빈자리</span><span class="pt">시작하면 컴퓨터</span></div>';
+    return '<div class="lrow seat' + (i === ME ? ' mine' : '') + '"><span class="av" style="--av:' + AVATAR[i % AVATAR.length] + '">' + esc(x.name.slice(0, 1)) + '</span>' +
+      '<span class="who">' + esc(x.name) + (i === ME ? ' (나)' : '') + '</span><span class="pt">' + (i === r.host ? '방장' : x.online ? '' : '연결 끊김') + '</span></div>';
+  }).join('');
+  var lv = { easy: '느긋한', normal: '보통', hard: '고수' };
+  var opts = host ?
+    '<div class="field"><div class="lb">인원 (빈자리는 컴퓨터)</div>' + seg('max', [[4, '4명'], [5, '5명'], [6, '6명'], [7, '7명'], [8, '8명']], st.max) + '</div>' +
+    '<div class="field"><div class="lb">차례마다 제한 시간</div>' + seg('turnSec', [[10, '10초'], [15, '15초'], [20, '20초'], [30, '30초'], [60, '60초']], st.turnSec) + '</div>' +
+    '<div class="field"><div class="lb">판 수</div>' + seg('games', [[3, '3판'], [5, '5판'], [10, '10판']], st.games) + '</div>' +
+    '<div class="field"><div class="lb">컴퓨터 실력</div>' + seg('level', [['easy', '느긋한'], ['normal', '보통'], ['hard', '고수']], st.level) + '</div>' +
+    '<div class="field"><div class="lb">첫 판</div>' + seg('firstTax', [['1', '계급대로 세금'], ['0', '평등하게']], st.firstTax ? '1' : '0') + '</div>' +
+    '<label class="switch"><span>모르는 사람도 빠른 참가로 들어오기</span><input type="checkbox" id="pubIn"' + (st.public ? ' checked' : '') + '></label>'
+    : '<p class="seg-note">' + st.max + '명 · 제한 시간 ' + st.turnSec + '초 · ' + st.games + '판 · 컴퓨터 ' + lv[st.level] + ' · 첫 판 ' + (st.firstTax ? '세금 있음' : '평등하게') + '</p>';
+  el('sheet').dataset.dismiss = '0';
+  openSheet('<h2>방 ' + r.code + '</h2>' +
+    '<p class="lead">친구에게 방 번호나 초대 링크를 보내 주세요.</p>' +
+    '<div class="linkbox"><span id="linkText">' + esc(link) + '</span><button class="btn sm" id="copyBtn" type="button">링크 복사</button></div>' +
+    '<div class="list">' + rows + '</div>' + opts +
+    '<div class="btns">' + (host ? '<button class="btn primary" id="goBtn" type="button">시작하기 · 사람 ' + humans + '명' + (empty ? ' + 컴퓨터 ' + empty + '명' : '') + '</button>'
+      : '<p class="seg-note" style="text-align:center">방장이 시작하길 기다리는 중이에요</p>') +
+    '<button class="btn ghost" id="outBtn" type="button">방 나가기</button></div>', null, 'lobby');
+  el('copyBtn').onclick = function () {
+    var b = this;
+    var done = function () { b.textContent = '복사했어요'; setTimeout(function () { if (b.isConnected) b.textContent = '링크 복사'; }, 1500); };
+    try { navigator.clipboard.writeText(link).then(done, function () { selectText(el('linkText')); }); } catch (e) { selectText(el('linkText')); }
+  };
+  el('outBtn').onclick = function () { Net.leave(); };
+  if (!host) return;
+  el('goBtn').onclick = function () { ac(); this.disabled = true; Net.send({ t: 'start' }); };
+  el('pubIn').onchange = function () { Net.send({ t: 'settings', settings: { public: this.checked } }); };
+  el('sheet').querySelectorAll('[data-seg]').forEach(function (g) {
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var k = g.dataset.seg, v = b.dataset.val, o = {};
+      o[k] = k === 'level' ? v : k === 'firstTax' ? v === '1' : +v;
+      Net.send({ t: 'settings', settings: o });
+    });
+  });
+}
+function selectText(node) { try { var r = document.createRange(); r.selectNodeContents(node); var s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {} }
+
+var Net = {
+  api: function (path, body, get) {
+    return fetch(SERVER + path, get ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) })
+      .then(function (r) { return r.json(); });
+  },
+  stats: function () {
+    var line = el('statsLine');
+    if (startNote) { line.textContent = startNote; line.classList.add('warn-text'); startNote = ''; return; }
+    Net.api('/api/stats', null, true).then(function (d) {
+      if (!el('statsLine')) return;
+      el('statsLine').textContent = d.waitingPlayers ? '지금 ' + d.waitingPlayers + '명이 방에서 기다려요' + (d.playingRooms ? ' · ' + d.playingRooms + '개 방에서 게임 중' : '')
+        : (d.playingRooms ? d.playingRooms + '개 방에서 게임 중 · ' : '') + '빠른 참가를 누르면 새 방을 열고 기다려요';
+    }).catch(function () { if (el('statsLine')) el('statsLine').textContent = '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요'; });
+  },
+  enter: function (kind, code, silent) {
+    settings.mode = 'online'; save();
+    if (!silent) { el('sheet').dataset.dismiss = '0'; openSheet('<h2>들어가는 중…</h2><p class="lead">방을 찾고 있어요.</p>', null, 'joining'); }
+    var fail = function () { startNote = '서버에 연결하지 못했어요. 잠시 뒤 다시 해 주세요'; closeSheet(); settings.mode = 'online'; showStart(); };
+    if (kind === 'quick') Net.api('/api/quick').then(function (r) { r.code ? Net.connect(r.code) : fail(); }, fail);
+    else if (kind === 'make') Net.api('/api/rooms', { public: false }).then(function (r) { r.code ? Net.connect(r.code) : fail(); }, fail);
+    else Net.connect(code);
+  },
+  connect: function (code) {
+    if (!NET) { soloS = S; S = null; NET = { code: code, room: null, offset: 0, retry: 0, gen: -1 }; ME = 0; ui = newUi(); clearTimeout(ui.timer); }
+    try { localStorage.setItem(ROOM_KEY, code); } catch (e) {}
+    try { if (location.hash !== '#' + code) history.replaceState(null, '', '#' + code); } catch (e) {}
+    var url = SERVER.replace(/^http/, 'ws') + '/ws/' + code + '?pid=' + myPid() + '&name=' + encodeURIComponent(settings.name || '나');
+    var ws;
+    try { ws = new WebSocket(url); } catch (e) { Net.retry(); return; }
+    NET.ws = ws;
+    ws.onopen = function () { if (NET) NET.retry = 0; hideConn(); };
+    ws.onmessage = function (e) {
+      if (e.data === 'pong' || !NET || NET.ws !== ws) return;
+      var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.t === 'error') {
+        if (m.fatal) { NET.fatal = true; Net.drop(m.message); }
+        else { hint(esc(m.message), true); ui.sentSeq = -1; if (S) setTimeout(function () { if (S) renderHand(); }, 1500); }
+        return;
+      }
+      if (m.t === 'state') Net.onState(m);
+    };
+    ws.onclose = function () { if (NET && NET.ws === ws && !NET.fatal && !NET.leaving) Net.retry(); };
+  },
+  retry: function () {
+    if (!NET) return;
+    NET.retry++;
+    if (NET.retry > 10) { Net.drop('서버에 다시 연결하지 못했어요. 잠시 뒤 다시 들어와 주세요'); return; }
+    showConn('연결이 끊겼어요 · 다시 연결하는 중');
+    setTimeout(function () { if (NET && !NET.leaving) Net.connect(NET.code); }, Math.min(5000, 500 * NET.retry));
+  },
+  send: function (o) {
+    if (NET && NET.ws && NET.ws.readyState === 1) NET.ws.send(JSON.stringify(o));
+    else if (NET) { showConn('연결 중이에요 · 잠시만요'); ui.sentSeq = -1; }
+  },
+  leave: function () {
+    if (!NET) return;
+    NET.leaving = true;
+    try { NET.ws.send(JSON.stringify({ t: 'leave' })); } catch (e) {}
+    var ws = NET.ws; setTimeout(function () { try { ws.close(); } catch (e) {} }, 300);
+    Net.exit(); showStart();
+  },
+  drop: function (msg) {
+    var ws = NET && NET.ws;
+    Net.exit();
+    try { ws && ws.close(); } catch (e) {}
+    startNote = msg || '';
+    settings.mode = 'online';
+    showStart();
+  },
+  exit: function () {
+    try { localStorage.removeItem(ROOM_KEY); } catch (e) {}
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    NET = null; ME = 0; S = soloS; soloS = null; ui = newUi();
+    hideConn(); closeSheet();
+    if (S) { ui.seenSeq = S.seq; render(); } else clearTable();
+  },
+  onState: function (m) {
+    NET.room = m.room; NET.offset = m.now - Date.now(); ME = m.seat;
+    hideConn();
+    if (m.room.status === 'waiting' || !m.view) {
+      S = null; NET.gen = -1; clearTable();
+      if (sheetKind !== 'menu' && sheetKind !== 'rules') showLobby();
+      return;
+    }
+    var v = m.view, fresh = NET.gen !== m.room.gen || !S;
+    NET.gen = m.room.gen;
+    if (fresh) { ui = newUi(); ui.seenSeq = v.seq; if (sheetKind === 'lobby' || sheetKind === 'joining' || sheetKind === 'start') closeSheet(); }
+    var news = fresh ? [] : v.log.filter(function (e) { return e.seq > ui.seenSeq; });
+    ui.seenSeq = v.seq;
+    S = v;
+    if (m.timedOut) banner('시간이 지나 자동으로 했어요', true);
+    react(news);
+    var ended = S.phase === 'gameEnd' || S.phase === 'matchEnd';
+    if (S.phase === 'drawn') { if (!ui.drawSeen && sheetKind !== 'menu' && sheetKind !== 'rules') { ui.drawSeen = true; showDraw(); } }
+    else if (sheetKind === 'draw') closeSheet();
+    if (ended) {
+      var justEnded = news.some(function (e) { return e.t === 'end'; });
+      if (!justEnded && (sheetKind === 'result' || sheetKind === null || fresh)) showResult();
+    } else if (sheetKind === 'result' || sheetKind === 'lobby' || sheetKind === 'joining') closeSheet();
+    render(); schedule(); tick();
+  }
+};
+setInterval(function () { if (NET && NET.ws && NET.ws.readyState === 1) { try { NET.ws.send('ping'); } catch (e) {} } }, 25000);
+
 /* ───── 부팅 ───── */
 function start(data) {
   load();
   if (data && data.state) { S = data.state; if (data.settings) Object.assign(settings, data.settings); }
+  var hash = (location.hash.match(/^#(\d{6})$/) || [])[1];
+  var saved = null; try { saved = localStorage.getItem(ROOM_KEY); } catch (e) {}
+  if (SERVER && saved && /^\d{6}$/.test(saved) && (!hash || hash === saved)) { Net.enter('join', saved, true); return; }
   if (S) render();
-  showStart();
+  showStart(SERVER && hash ? hash : null);
 }
 try { window.claude && window.claude.hot && window.claude.hot.snapshot(function () { return { state: S, settings: settings }; }); } catch (e) {}
-window.__dalmuti = { get: function () { return S; }, commit: commit, ui: ui, settings: settings };
+window.__dalmuti = { get: function () { return S; }, commit: commit, ui: function () { return ui; }, settings: settings, net: function () { return NET; }, me: function () { return ME; } };
 if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(start);
 else start((window.claude && window.claude.hot && window.claude.hot.data) || {});
 })();

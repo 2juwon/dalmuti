@@ -328,6 +328,27 @@
     return s;
   };
 
+  /* 한 사람에게 보여 줄 상태 (온라인): 남의 손패·씨앗·남끼리의 세금 카드·숨긴 혁명은 가림 */
+  DM.viewFor = function (s, seat) {
+    var v = clone(s);
+    v.seed = 0;
+    var reveal = s.phase === 'gameEnd' || s.phase === 'matchEnd';
+    v.players.forEach(function (p) {
+      p.count = DM.handSize(p.hand);
+      if (p.id !== seat && !reveal) p.hand = null;
+    });
+    if (v.tax) v.tax.pairs.forEach(function (p) {
+      if (p.from === seat || p.to === seat) return;
+      p.taken = p.taken.map(function () { return 0; });
+      if (p.given) p.given = p.given.map(function () { return 0; });
+    });
+    if (v.revolution && !v.revolution.reveal && v.revolution.pid !== seat) {
+      v.revolution = s.phase === 'revolution' ? { pid: -1, reveal: null, kind: null } : null;
+    }
+    return v;
+  };
+  DM.count = function (p) { return p.hand ? DM.handSize(p.hand) : (p.count || 0); };
+
   root.DM = DM;
   if (typeof module !== 'undefined' && module.exports) module.exports = DM;
 })(typeof window !== 'undefined' ? window : globalThis);

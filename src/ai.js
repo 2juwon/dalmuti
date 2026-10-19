@@ -16,7 +16,7 @@
   };
   function maxOppCards(s, pid) {
     var m = 0;
-    s.players.forEach(function (p) { if (p.id !== pid && s.finished.indexOf(p.id) < 0) m = Math.max(m, DM.handSize(p.hand)); });
+    s.players.forEach(function (p) { if (p.id !== pid && s.finished.indexOf(p.id) < 0) m = Math.max(m, DM.count(p)); });
     return m;
   }
   // (v, t)를 내면 아무도 못 받는가?
@@ -117,7 +117,7 @@
           var sure = AI.sureWin(s, pid, m.v, m.n + m.j);
           if (sure) { sc += 1.5; if (groups(after) <= 1 && after[13] === 0) sc += 50; if (groups(after) === 0) sc += 50; }
           // 거의 끝난 사람이 이 판을 가져가려 하면 막기
-          var lp = s.trick.by, lpLeft = DM.handSize(s.players[lp].hand);
+          var lp = s.trick.by, lpLeft = DM.count(s.players[lp]);
           if (lpLeft > 0 && lpLeft <= 2) sc += 2.5;
         }
       }
@@ -153,7 +153,7 @@
     t.players.forEach(function (p) {
       p.level = 'normal';
       if (p.id === pid) return;
-      var c = DM.handSize(p.hand); p.hand = DM.zeros();
+      var c = DM.count(p); p.hand = DM.zeros();
       for (var q = 0; q < c; q++) p.hand[pool[at++]]++;
     });
     return t;

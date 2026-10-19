@@ -202,5 +202,40 @@ t('컴퓨터: 마지막 묶음이면 어릿광대까지 한꺼번에', () => {
   eq([a.v, a.n, a.j], [7, 2, 1]);
 });
 
+t('온라인 보기: 남의 패·씨앗·남끼리 세금·숨긴 혁명은 가림', () => {
+  for (let seed = 1; seed < 300; seed++) {
+    let s = DM.apply(match(6, { seed }), { type: 'drawRanks' });
+    s = DM.apply(s, { type: 'deal' });
+    let holder = -1;
+    if (s.phase === 'revolution') {
+      holder = s.revolution.pid;
+      for (let k = 0; k < 6; k++) {
+        const v = DM.viewFor(s, k);
+        eq(v.revolution.pid, k === holder ? holder : -1, '혁명 고민 중인 사람');
+        eq(DM.pending(v).pid, k === holder ? holder : -1);
+      }
+      s = DM.apply(s, { type: 'revolution', pid: holder, reveal: false });
+      for (let k = 0; k < 6; k++) if (k !== holder) eq(DM.viewFor(s, k).revolution, null, '숨긴 혁명');
+    }
+    if (s.phase !== 'taxReturn') continue;
+    const pair = s.tax.pairs[0];
+    s = DM.apply(s, { type: 'giveBack', pid: pair.to, cards: AI.chooseGiveBack(s, pair.to, 2, 'normal') });
+    for (let k = 0; k < 6; k++) {
+      const v = DM.viewFor(s, k);
+      eq(v.seed, 0);
+      v.players.forEach((p, i) => { if (i !== k) eq(p.hand, null); eq(p.count, DM.handSize(s.players[i].hand)); eq(DM.count(p), p.count); });
+      ok(v.players[k].hand, '내 패');
+      v.tax.pairs.forEach((p, i) => {
+        const mine = p.from === k || p.to === k;
+        eq(p.taken, mine ? s.tax.pairs[i].taken : s.tax.pairs[i].taken.map(() => 0));
+        if (s.tax.pairs[i].given) ok(p.given && p.given.length === s.tax.pairs[i].given.length);
+      });
+      eq(DM.pending(v), DM.pending(s));
+    }
+    return;
+  }
+  throw new Error('세금 상황을 못 찾음');
+});
+
 console.log(`${pass} 통과, ${fail} 실패`);
 if (fail) process.exit(1);

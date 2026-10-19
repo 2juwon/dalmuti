@@ -1,6 +1,6 @@
 # 달무티
 
-컴퓨터 3~7명과 하는 달무티 카드 게임. 브라우저 하나로 돌아가고 설치·서버가 필요 없어요.
+달무티 카드 게임. 컴퓨터 3~7명과 하거나, 사람들과 방을 만들어 겨뤄요(빈자리는 컴퓨터).
 
 **플레이:** https://2juwon.github.io/dalmuti/
 
@@ -17,6 +17,19 @@
 - 80장이 나눠떨어지지 않으면 낮은 계급부터 한 장씩 더.
 - 혁명: 어릿광대 2장을 받은 사람이 세금 전에 공개 → 농노면 대혁명(계급 뒤집기 + 세금 없음), 다른 계급이면 세금만 없음.
 - 첫 판은 카드를 한 장씩 뽑아 계급을 정함(같은 수면 그 사람끼리 다시 뽑기). 설정에서 첫 판만 세금 없이 '평등하게' 고를 수 있음.
+
+## 사람들과 하기 (온라인)
+
+- '사람들과' → 빠른 참가(모르는 사람과) / 친구랑 할 방 만들기(6자리 번호, 초대 링크 `#번호`) / 방 번호로 들어가기
+- 방장이 정함: 인원 4~8명(빈자리는 컴퓨터), **차례마다 제한 시간 10·15·20·30·60초**, 판 수 3·5·10, 컴퓨터 실력, 첫 판 세금, 빠른 참가 공개 여부
+- 제한 시간이 지나면: 따라 낼 차례면 **자동 패스**, 선이라 패스할 수 없으면 가장 약한 묶음을 냄, 세금으로 돌려줄 카드는 추천 카드, 혁명은 숨기기
+- 두 번 연속 시간 초과면 '자리 비움' → 컴퓨터가 빨리 대신 둠. 아무거나 누르면 돌아옴
+- 낼 수 있는 카드가 없으면 1.2초 뒤 자동 패스 (시간 초과로 치지 않음)
+- 판이 끝나면 모두 '다음 판 준비'를 누르거나 25초 뒤 다음 판
+- 끊기거나 새로고침해도 같은 자리로 돌아옴(브라우저에 저장된 열쇠). 게임 중에 나가면 그 자리는 컴퓨터가 이어서 함
+- 서버는 각자에게 보여도 되는 것만 보냄: 남의 손패, 섞는 씨앗, 남끼리 주고받은 세금 카드, 숨긴 혁명(누가 어릿광대 둘을 가졌는지)과 그 고민 시간은 가림
+
+서버: Cloudflare Workers + Durable Objects (`server/`), 주소는 `config.json`. `main`에 서버·엔진·컴퓨터가 바뀌면 GitHub Actions '서버 배포'가 올림 — 저장소 Secrets에 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` 필요.
 
 ## 문서에 없어서 정한 부분
 
@@ -41,10 +54,15 @@
 | `src/ai.js` | 컴퓨터 `DMAI` |
 | `src/art.js` | 카드 그림 `DMArt` — 타로 카드 느낌으로 직접 그린 SVG 13장 (원작 카드 그림은 쓰지 않음) |
 | `src/ui.html` | 화면 (엔진·컴퓨터·그림이 빌드 때 들어감) |
+| `server/src/index.js` | 온라인 서버 — 방(Room), 빠른 참가 목록(Lobby), 제한 시간·자동 진행 |
+| `config.json` | 온라인 서버 주소 |
+| `.github/workflows/deploy-server.yml` | 서버 자동 배포 |
 | `build.js` | `index.html`, `dist/dalmuti.html`(Claude 아티팩트용) 생성 |
 | `test/rules.test.js` | 규칙 시험 |
 | `test/sim.js` | 컴퓨터끼리 대국 (멈춤·카드 수 검사, 실력 비교) |
 | `test/browser.py` | Playwright로 화면을 눌러 한 경기 끝까지 |
+| `server/test/online.test.mjs` | 로컬 서버에 봇을 붙여 온라인 흐름·정보 노출 검사 |
+| `test/online_browser.py` | 브라우저 3개로 온라인 한 경기 (방 만들기·초대·시간 초과·새로고침·한 번 더) |
 
 ## 고치는 법
 
@@ -53,6 +71,15 @@ node test/rules.test.js      # 규칙 시험
 BUDGET=40 node test/sim.js 150   # 컴퓨터끼리 대국
 node build.js                # index.html 다시 만들기
 python3 test/browser.py "$PWD/index.html" /tmp 390 5   # 휴대폰 폭, 5명
+```
+
+온라인 시험:
+
+```sh
+cd server && npm ci && npx wrangler dev --var FAST_TEST:1   # 다른 창 (시간이 10배 빨라짐)
+node server/test/online.test.mjs
+node build.js --server=http://127.0.0.1:8787 --out=dist/local.html
+python3 test/online_browser.py "$PWD/dist/local.html" /tmp
 ```
 
 저장은 각자 브라우저에만 됩니다(localStorage `dalmuti-v1` — 설정과 진행 중인 경기).
