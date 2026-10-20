@@ -11,7 +11,6 @@ import DMAI from '../../src/ai.js';
 DMAI.budget = 100;            // 고수 컴퓨터가 한 수에 상상해 볼 판 수 (서버 CPU 아끼기)
 const DRAW_MS = 5000;         // 계급 뽑기 결과 보여 주는 시간
 const NEXT_MS = 25000;        // 판이 끝나고 다음 판까지 최대 대기
-const NOMOVE_MS = 1200;       // 낼 수 있는 카드가 없으면 이만큼 뒤 자동 패스
 const AWAY_MS = 1200;         // 자리 비운 사람 대신 둘 때
 const AI_MS = { play: [800, 1400], giveBack: [900, 1300], revolution: [900, 1300] };
 const EMPTY_ROOM_MS = 30 * 60 * 1000;  // 아무도 없으면 30분 뒤 방 정리
@@ -323,9 +322,7 @@ export class Room extends DurableObject {
     const actor = pend.pid, seat = r.seats[actor];
     const live = seat.kind === 'human' && online.has(seat.pid) && !seat.away;
     if (live) {
-      if (pend.kind === 'play' && g.trick && DM.moves(g, actor).length === 0) {
-        return this.arm(keep('nomove', actor) ? p : { kind: 'nomove', seat: actor, step, at: now + NOMOVE_MS * this.speed });
-      }
+      // 낼 카드가 없어도 사람은 자동으로 넘기지 않음 — 바로 넘어가면 그 사람에게 더 작은 카드가 없다는 게 드러남
       if (keep('timeout', actor)) return this.arm(p);
       return this.arm({ kind: 'timeout', seat: actor, step, at: now + r.settings.turnSec * 1000 * this.speed, visible: true });
     }
@@ -351,7 +348,6 @@ export class Room extends DurableObject {
       if (!g || r.status !== 'playing' || g.seq !== p.step) { r.pending = null; await this.afterChange(); return; }
       if (p.kind === 'deal') return this.play({ type: 'deal' });
       if (p.kind === 'next') return this.play({ type: 'nextGame' });
-      if (p.kind === 'nomove') return this.play({ type: 'pass', pid: p.seat });
       const seat = r.seats[p.seat];
       if (p.kind === 'timeout') {
         seat.timeouts = (seat.timeouts || 0) + 1;

@@ -58,9 +58,22 @@ class Bot {
         this.last = m; this.count++;
         if (m.timedOut) this.timedOut++;
         checkPrivacy(m);
+        this.watch(m);
         if (this.auto) this.react(m);
       };
     });
+  }
+  // 내 차례가 언제 시작해서 언제 넘어갔는지 (낼 카드가 없을 때 일찍 넘어가지 않는지 보려고)
+  watch(m) {
+    const v = m.view;
+    if (!v || v.phase !== 'play') return;
+    const p = DM.pending(v);
+    if (p && p.pid === m.seat && this.turnSeq !== v.seq) { this.turnSeq = v.seq; this.turnAt = Date.now(); this.turnNoMove = !!v.trick && DM.moves(v, m.seat).length === 0; this.turnAway = !!m.room.seats[m.seat].away; }
+    const last = v.log[v.log.length - 1];
+    if (last && last.t === 'pass' && last.pid === m.seat && this.turnAt && this.turnSeq === v.seq - 1) {
+      if (!this.turnAway) (this.passWaits = this.passWaits || []).push({ ms: Date.now() - this.turnAt, noMove: this.turnNoMove }); // 자리 비움이면 컴퓨터가 빨리 대신 두는 게 맞음
+      this.turnAt = 0;
+    }
   }
   react(m) {
     const v = m.view;
@@ -72,7 +85,6 @@ class Bot {
     if (this.idle) return;
     const p = DM.pending(v);
     if (!p || p.pid !== m.seat) return;
-    if (p.kind === 'play' && v.trick && DM.moves(v, m.seat).length === 0) return; // 서버가 자동 패스
     const c = DM.clone(v); c.players[m.seat].level = 'normal';
     const a = AI.decide(c);
     if (!a) return;
@@ -115,6 +127,9 @@ async function until(fn, ms, what) {
   await until(() => a.last.view.phase !== 'drawn', 3000, '자동으로 카드 나누기');
   // 잠꾸러기가 시간 초과로 자동 패스/자동 진행 되는지
   await until(() => idle.timedOut >= 1, 20000, '시간 초과 알림');
+  await until(() => (idle.passWaits || []).some((w) => w.noMove), 60000, '낼 카드가 없는 잠꾸러기 차례');
+  const early = idle.passWaits.filter((w) => w.noMove && w.ms < 850);
+  assert.deepStrictEqual(early, [], '낼 카드가 없어도 제한 시간 전에 넘어가면 안 됨 ' + JSON.stringify(idle.passWaits));
   await until(() => a.last.room.seats[idle.last.seat].away, 30000, '두 번 시간 초과면 자리 비움');
   await until(() => a.last.room.status === 'ended', 120000, '3판 끝까지');
   const v = a.last.view;
